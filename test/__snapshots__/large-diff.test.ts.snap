@@ -4,6 +4,8 @@ exports[`summary view > renders one line per workflow for the 50-workflow fixtur
 "Changes in 35 workflows (instance → local), summary view; use --no-stat or \`flowdiff diff <workflow>\` for details
 
 ! Shipment Alert 39 (largeFixture39)                 deleted on instance
+~ Ticket Import 43 (largeFixture43)          active  0 behavior   1 cosmetic   1 rename  ⚠ 1 broken reference
+~ Report Import 44 (largeFixture44)                  0 behavior   1 cosmetic   1 rename  ⚠ 1 broken reference
 ~ Refund Cleanup 29 (largeFixture29)         active  7 behavior                +1 node · 4 params · 1 credential · 1 setting
 ~ Invoice Sync 48 (largeFixture48)           active  2 behavior   1 cosmetic   2 params · 1 possible default
 ~ Order Sync 49 (largeFixture49)             active  2 behavior   1 cosmetic   2 params · 1 tag
@@ -11,7 +13,6 @@ exports[`summary view > renders one line per workflow for the 50-workflow fixtur
 ~ Lead Digest 18 (largeFixture18)            active  0 behavior   1 cosmetic   1 note
 ~ Report Digest 20 (largeFixture20)          active  0 behavior   1 cosmetic   1 possible default
 ~ Report Router 12 (largeFixture12)          active  0 behavior   1 cosmetic   1 rename
-~ Ticket Import 43 (largeFixture43)          active  0 behavior   1 cosmetic   1 rename  ⚠ 1 broken reference
 ~ Invoice Alert 32 (largeFixture32)                  8 behavior                +2 nodes · 4 params · 1 credential · 1 setting
 ~ Lead Alert 34 (largeFixture34)                     8 behavior                +2 nodes · 4 params · 1 credential · 1 setting
 ~ Report Alert 36 (largeFixture36)                   8 behavior                +2 nodes · 4 params · 1 credential · 1 setting
@@ -32,7 +33,6 @@ exports[`summary view > renders one line per workflow for the 50-workflow fixtur
 ~ Order Digest 17 (largeFixture17)                   0 behavior   1 cosmetic   1 rename
 ~ Refund Digest 21 (largeFixture21)                  0 behavior   1 cosmetic   1 tag
 ~ Refund Router 13 (largeFixture13)                  0 behavior   1 cosmetic   1 note
-~ Report Import 44 (largeFixture44)                  0 behavior   1 cosmetic   1 rename  ⚠ 1 broken reference
 ~ Shipment Router 15 (largeFixture15)                0 behavior   1 cosmetic   1 possible default
 ~ Signup Router 14 (old) (largeFixture14)            0 behavior   1 cosmetic   1 rename
 ~ Ticket Digest 19 (old) (largeFixture19)            0 behavior   1 cosmetic   1 rename

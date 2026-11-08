@@ -92,16 +92,54 @@ describe('generated 50-workflow fixture', () => {
 describe('display order', () => {
   const ordered = orderForDisplay(comparisonsOf(generateLargeFixture()));
 
-  it('puts deleted workflows first, then changed, then only-local, then the rest', () => {
-    const statuses = ordered.map((c) => c.status);
-    const firstIndex = (status: string) => statuses.indexOf(status as WorkflowComparison['status']);
-    expect(firstIndex('deleted-on-instance')).toBe(0);
-    expect(firstIndex('changed')).toBe(1);
-    expect(firstIndex('only-after')).toBeGreaterThan(statuses.lastIndexOf('changed'));
+  it('puts deleted workflows first, then broken references, then changed, then only-local', () => {
+    const groups = ordered.map((c) =>
+      c.status === 'deleted-on-instance'
+        ? 'deleted'
+        : c.warnings.length > 0
+          ? 'warnings'
+          : c.status,
+    );
+    expect(groups.slice(0, 3)).toEqual(['deleted', 'warnings', 'warnings']);
+    expect(groups.indexOf('changed')).toBe(3);
+    expect(groups.indexOf('only-after')).toBeGreaterThan(groups.lastIndexOf('changed'));
+  });
+
+  it('orders workflows with warnings among themselves by active, then changes', () => {
+    const withWarnings = ordered.filter((c) => c.warnings.length > 0).map((c) => c.id);
+    // 43 is active, 44 is not.
+    expect(withWarnings).toEqual(['largeFixture43', 'largeFixture44']);
+  });
+
+  it('puts a new workflow with broken references in the warnings group', () => {
+    const brokenNew: WorkflowComparison = {
+      id: 'n',
+      name: 'New',
+      status: 'only-after',
+      active: false,
+      changes: [],
+      warnings: [
+        {
+          kind: 'broken-reference',
+          node: { id: 'x', name: 'X', type: 't' },
+          path: [],
+          reference: 'Gone',
+        },
+      ],
+    };
+    const changed: WorkflowComparison = {
+      id: 'c',
+      name: 'Changed',
+      status: 'changed',
+      active: false,
+      changes: [],
+      warnings: [],
+    };
+    expect(orderForDisplay([changed, brokenNew]).map((c) => c.id)).toEqual(['n', 'c']);
   });
 
   it('sorts changed workflows by active, then behavior changes, then cosmetic changes', () => {
-    const changed = ordered.filter((c) => c.status === 'changed');
+    const changed = ordered.filter((c) => c.status === 'changed' && c.warnings.length === 0);
     const keys = changed.map((c) => {
       const counts = countChanges(c.changes);
       return [c.active ? 1 : 0, counts.behavior, counts.cosmetic];

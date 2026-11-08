@@ -69,26 +69,37 @@ function isListed(comparison: WorkflowComparison): boolean {
 
 const STATUS_RANK: Record<WorkflowComparison['status'], number> = {
   'deleted-on-instance': 0,
-  'only-before': 1,
-  changed: 2,
-  'only-after': 3,
-  unchanged: 4,
-  untracked: 5,
+  'only-before': 2,
+  changed: 3,
+  'only-after': 4,
+  unchanged: 5,
+  untracked: 6,
 };
 
+/** Workflows with broken-reference warnings come right after deleted ones. */
+const WARNINGS_RANK = 1;
+
+function displayRank(comparison: WorkflowComparison): number {
+  if (comparison.status !== 'deleted-on-instance' && comparison.warnings.length > 0) {
+    return WARNINGS_RANK;
+  }
+  return STATUS_RANK[comparison.status];
+}
+
 /**
- * Display order: workflows that need attention first (deleted), then changed
- * workflows with active ones and the most behavior changes first, then new ones.
- * JSON output keeps the plain name/id order.
+ * Display order: workflows that need attention first (deleted, then broken
+ * references), then changed workflows with active ones and the most behavior
+ * changes first, then new ones. JSON output keeps the plain name/id order.
  */
 export function orderForDisplay(comparisons: WorkflowComparison[]): WorkflowComparison[] {
   const counts = new Map(
     comparisons.map((comparison) => [comparison, countChanges(comparison.changes)]),
   );
   return [...comparisons].sort((x, y) => {
-    const byStatus = STATUS_RANK[x.status] - STATUS_RANK[y.status];
-    if (byStatus !== 0) return byStatus;
-    if (x.status === 'changed') {
+    const rank = displayRank(x);
+    const byRank = rank - displayRank(y);
+    if (byRank !== 0) return byRank;
+    if (rank === WARNINGS_RANK || rank === STATUS_RANK.changed) {
       const cx = counts.get(x);
       const cy = counts.get(y);
       const byActive = Number(y.active) - Number(x.active);

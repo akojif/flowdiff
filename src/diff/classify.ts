@@ -67,3 +67,12 @@ export function countChanges(changes: Change[]): ChangeCounts {
     possibleDefaults: changes.filter(isPossibleDefaultChange).length,
   };
 }
+
+/**
+ * Whether a workflow's diff matters for behavior: it has behavior changes, or
+ * broken-reference warnings (a rename itself is cosmetic, but references left
+ * pointing at the old name make nodes fail). Intended for `--exit-code=behavior`.
+ */
+export function hasBehaviorImpact(comparison: { changes: Change[]; warnings: unknown[] }): boolean {
+  return comparison.warnings.length > 0 || countChanges(comparison.changes).behavior > 0;
+}

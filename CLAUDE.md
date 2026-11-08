@@ -41,7 +41,7 @@ This is a public, open-source portfolio project. Code quality, tests, and the RE
   - `classifyChange`: renames, notes, layout, tags, groups and possible defaults are cosmetic; everything else (including anything new) is behavior.
   - `findBrokenReferences`: expressions/Code nodes referencing a node name that doesn't exist (`$('Name')`, `$node["Name"]`, `$node.Name`, `$items('Name')`; sticky notes ignored). Reported as warnings on the after side of changed or new workflows.
 - `src/render/` – turn `Change[]` into readable terminal text or JSON.
-  - Text: behavior changes first, then `cosmetic:` and `possible defaults:` groups. Display order: deleted, then changed (active, most behavior, most cosmetic first), then new. Summary view (one line per workflow) above 5 changed workflows; `--stat` / `--no-stat` force it on/off.
+  - Text: behavior changes first, then `cosmetic:` and `possible defaults:` groups. Display order: deleted, then workflows with broken-reference warnings, then changed (active, most behavior, most cosmetic first), then new. Summary view (one line per workflow) above 5 changed workflows; `--stat` / `--no-stat` force it on/off.
   - JSON: name/id order, never truncated, each change has `impact`, each workflow has `counts` and `warnings`.
 - `src/config/` – load `.env`, read/validate `flowdiff.config.json`, resolve the instance URL (env over config) and API key (env only).
 - `src/workspace/` – workflow file naming (`<slug>.<id>.json`) and `.flowdiff/state.json` (content hash + instance `versionId` at last pull).
@@ -85,6 +85,6 @@ This is a public, open-source portfolio project. Code quality, tests, and the RE
 
 ## Backlog
 
-- Phase 4: `--exit-code=behavior`, so CI only fails on behavior changes (not cosmetic-only diffs).
+- Phase 4: `--exit-code=behavior`, so CI only fails on behavior changes (not cosmetic-only diffs). Workflows with broken-reference warnings count as behavior even when the rename itself is cosmetic; use `hasBehaviorImpact` from `src/diff/classify.ts`.
 - Clearer diff header than "instance → local", e.g. "Changes push would make to the instance" (and a matching phrasing for git ranges).
 - Opt-in node defaults cache: `flowdiff defaults fetch --n8n-version <v>` downloads `n8n-nodes-base@<v>`'s `dist/types/nodes.json` from npm into `.flowdiff/cache/` (gitignored, never bundled: that data is under n8n's Sustainable Use License, and flowdiff stays MIT). A parameter missing on one side and equal to its declared default for that node type/version on the other would then not count as a change. Unknown type/version: show the change. Note: npm's `latest` tag for n8n-nodes-base is stale; use the version matching the instance (e.g. the `stable` tag).

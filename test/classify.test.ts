@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { classifyChange, countChanges, type Change } from '../src/diff/index.js';
+import { classifyChange, countChanges, hasBehaviorImpact, type Change } from '../src/diff/index.js';
+import { at } from './helpers.js';
 
 const node = { id: 'n1', name: 'Node', type: 'n8n-nodes-base.set' };
 const group = { id: 'g1', name: 'Group' };
@@ -73,5 +74,22 @@ describe('countChanges', () => {
       cosmetic: cosmetic.length,
       possibleDefaults: 1,
     });
+  });
+});
+
+describe('hasBehaviorImpact', () => {
+  const rename = at(cosmetic, 1);
+  const warning = { kind: 'broken-reference', node, path: [], reference: 'Gone' };
+
+  it('is false for cosmetic-only changes', () => {
+    expect(hasBehaviorImpact({ changes: [rename], warnings: [] })).toBe(false);
+  });
+
+  it('is true for a cosmetic rename that left broken references', () => {
+    expect(hasBehaviorImpact({ changes: [rename], warnings: [warning] })).toBe(true);
+  });
+
+  it('is true for behavior changes', () => {
+    expect(hasBehaviorImpact({ changes: [at(behavior, 0)], warnings: [] })).toBe(true);
   });
 });
