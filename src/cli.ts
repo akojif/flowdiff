@@ -38,6 +38,8 @@ program
   .option('--tag <name>', 'only compare workflows with this tag (overrides the saved tag)')
   .option('--no-tag', 'ignore the tag saved in flowdiff.config.json for this run')
   .option('--all', 'list untracked instance workflows individually')
+  .option('--stat', 'one summary line per workflow (default when more than 5 changed)')
+  .option('--no-stat', 'always show every change')
   .option('--json', 'machine-readable output (never truncated)')
   .option('--include-layout', 'also show node position changes')
   .option('--full', 'show long values in full instead of truncating them')

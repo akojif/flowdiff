@@ -55,15 +55,16 @@ describe('renderText', () => {
 
       ~ Fixture: IF Branch (fixtureIfBranch1)
           ~ status  active → inactive
-          + tag     reviewed
-          ~ node    "Is Active?" renamed to "Status OK?"
           + prop    "Mark Inactive" › disabled: true
           + node    "Notify" (n8n-nodes-base.noOp)
           - link    "Is Active?" (false) → "Mark Inactive"
           + link    "Status OK?" (false) → "Notify"
           ~ setting timezone: "UTC" → "Europe/London"
+          cosmetic:
+            + tag     reviewed
+            ~ node    "Is Active?" renamed to "Status OK?"
 
-      1 changed, 0 unchanged."
+      1 changed (1 with behavior changes), 0 unchanged."
     `);
   });
 
@@ -90,7 +91,7 @@ describe('renderText', () => {
                     -return items;
                     +return items.filter(Boolean);
 
-      1 changed, 0 unchanged."
+      1 changed (1 with behavior changes), 0 unchanged."
     `);
   });
 
@@ -114,11 +115,12 @@ describe('renderText', () => {
       "instance → local
 
       ~ Fixture: Node Groups (fixtureGroups001)
-          ~ layout  "Start" [0,0] → [10,10]
           + cred    "Load Data" httpHeaderAuth: "Example Key"
-          ~ group   "Fetch" renamed to "Download"
+          cosmetic:
+            ~ layout  "Start" [0,0] → [10,10]
+            ~ group   "Fetch" renamed to "Download"
 
-      1 changed, 0 unchanged."
+      1 changed (1 with behavior changes), 0 unchanged."
     `);
   });
 
@@ -140,9 +142,9 @@ describe('renderText', () => {
     expect(renderText(comparisons, options)).toMatchInlineSnapshot(`
       "instance → local
 
-      + Fixture: Code and AI (fixtureCodeNode1)  only in local
+      - Fixture: IF Branch (fixtureIfBranch1)  active  only in instance
 
-      - Fixture: IF Branch (fixtureIfBranch1)  only in instance
+      + Fixture: Code and AI (fixtureCodeNode1)  only in local
 
       0 changed, 1 unchanged, 1 only in local, 1 only in instance."
     `);
@@ -155,10 +157,26 @@ describe('renderText', () => {
         id: 'fixtureLinear001',
         name: 'Fixture: Linear',
         status: 'deleted-on-instance',
+        active: false,
         changes: [],
+        warnings: [],
       },
-      { id: 'untracked0000001', name: 'Untracked One', status: 'untracked', changes: [] },
-      { id: 'untracked0000002', name: 'Untracked Two', status: 'untracked', changes: [] },
+      {
+        id: 'untracked0000001',
+        name: 'Untracked One',
+        status: 'untracked',
+        active: false,
+        changes: [],
+        warnings: [],
+      },
+      {
+        id: 'untracked0000002',
+        name: 'Untracked Two',
+        status: 'untracked',
+        active: false,
+        changes: [],
+        warnings: [],
+      },
       ...compareOne(linear, linear),
     ];
 
@@ -188,7 +206,14 @@ describe('renderText', () => {
 
     it('uses the singular for one untracked workflow and still reports no changes', () => {
       const one: WorkflowComparison[] = [
-        { id: 'untracked0000001', name: 'Untracked One', status: 'untracked', changes: [] },
+        {
+          id: 'untracked0000001',
+          name: 'Untracked One',
+          status: 'untracked',
+          active: false,
+          changes: [],
+          warnings: [],
+        },
         ...compareOne(linear, linear),
       ];
       expect(renderText(one, options)).toMatchInlineSnapshot(`
@@ -224,12 +249,13 @@ describe('renderText', () => {
       "instance → local
 
       ~ Fixture: Linear (fixtureLinear001)
-          ~ node    "Set Defaultsss" renamed to "Set Defaults"
+          cosmetic:
+            ~ node    "Set Defaultsss" renamed to "Set Defaults"
           possible defaults:
             + param   "Fetch Items" › method: "GET"
             + param   "Fetch Items" › specifyQuery: "keypair"
 
-      1 changed, 0 unchanged, 2 possible defaults.
+      1 changed (0 with behavior changes), 0 unchanged, 2 possible defaults.
       Possible defaults: parameters set on one side only. The n8n editor removes parameters equal to their defaults when saving; run flowdiff pull to refresh your baseline."
     `);
   });

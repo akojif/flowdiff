@@ -5,7 +5,7 @@ import { readConfig, type Config } from '../config/config-file.js';
 import { resolveConnection } from '../config/connection.js';
 import { loadDotEnv, readEnv } from '../config/env.js';
 import { resolveTagScope } from '../config/tag-scope.js';
-import { compareWorkflowSets, hasDifferences, type WorkflowComparison } from '../diff/index.js';
+import { compareWorkflowSets, hasDifferences, labelInstanceStatuses } from '../diff/index.js';
 import { FlowdiffError } from '../errors.js';
 import { normalizeWorkflow, type NormalizedWorkflow } from '../normalize/normalize.js';
 import { renderJson, renderText } from '../render/index.js';
@@ -19,6 +19,8 @@ export interface DiffFlags {
   tag?: string | false;
   /** List untracked instance workflows individually. */
   all?: boolean;
+  /** `--stat` (true) forces the summary view, `--no-stat` (false) forces details. */
+  stat?: boolean;
   json?: boolean;
   includeLayout?: boolean;
   full?: boolean;
@@ -36,7 +38,12 @@ export interface DiffCommandOptions {
   /** Creates the API client; only called when comparing against the instance. */
   getClient: () => N8nClient;
   color: boolean;
+  /** Terminal width for the summary view. */
+  width?: number;
 }
+
+/** Above this many changed workflows, text output starts with the summary view. */
+export const SUMMARY_THRESHOLD = 5;
 
 export interface DiffCommandResult {
   output: string;
@@ -88,9 +95,15 @@ export async function diffCommand(options: DiffCommandOptions): Promise<DiffComm
     sides.after = filterMap(sides.after, ids);
   }
 
-  const comparisons = compareWorkflowSets(sides.before, sides.after, {
+  const compared = compareWorkflowSets(sides.before, sides.after, {
     includeLayout: flags.includeLayout === true,
-  }).map((comparison) => relabel(comparison, sides));
+    // Local vs instance: whether a workflow runs is decided by the instance.
+    activeSide: sides.mode === 'instance' ? 'before' : 'after',
+  });
+  const comparisons =
+    sides.mode === 'instance' ? labelInstanceStatuses(compared, sides.pulledIds) : compared;
+  const differing = comparisons.filter((c) => c.status !== 'unchanged' && c.status !== 'untracked');
+  const view = (flags.stat ?? differing.length > SUMMARY_THRESHOLD) ? 'summary' : 'detail';
   const labels = { beforeLabel: sides.beforeLabel, afterLabel: sides.afterLabel };
   const output =
     flags.json === true
@@ -100,6 +113,8 @@ export async function diffCommand(options: DiffCommandOptions): Promise<DiffComm
           color: options.color,
           full: flags.full === true,
           showAll: flags.all === true,
+          view,
+          ...(options.width === undefined ? {} : { width: options.width }),
         });
   return { output, differs: hasDifferences(comparisons) };
 }
@@ -147,20 +162,6 @@ async function instanceSides(
     files: filesOf(local),
     pulledIds: new Set(Object.keys(state.workflows)),
   };
-}
-
-/**
- * In instance mode, a workflow only on the instance is "untracked" (push never
- * deletes, so it is not a removal), and a local workflow that was pulled before
- * but is gone from the instance is "deleted on instance", not a new workflow.
- */
-function relabel(comparison: WorkflowComparison, sides: Sides): WorkflowComparison {
-  if (sides.mode !== 'instance') return comparison;
-  if (comparison.status === 'only-before') return { ...comparison, status: 'untracked' };
-  if (comparison.status === 'only-after' && sides.pulledIds.has(comparison.id)) {
-    return { ...comparison, status: 'deleted-on-instance' };
-  }
-  return comparison;
 }
 
 function workflowsOf(files: Map<string, WorkflowFile>): Map<string, NormalizedWorkflow> {
@@ -230,6 +231,8 @@ export async function runDiff(
     workflow,
     flags,
     color: pc.isColorSupported,
+    // `columns` is only meaningful when writing to a terminal.
+    ...(process.stdout.isTTY ? { width: process.stdout.columns } : {}),
     getClient: () => {
       loadDotEnv(cwd);
       return createClient({ connection: resolveConnection(config, readEnv()) });
