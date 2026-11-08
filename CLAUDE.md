@@ -75,3 +75,7 @@ This is a public, open-source portfolio project. Code quality, tests, and the RE
    - status and push use the same tag scope as diff (`resolveTagScope`).
 4. Polish: GitHub Action posting diffs as PR comments, hard-coded-secret scanner, README with `vhs` demo, npm publish
    - The GitHub Action must redact values the secret scanner flags before posting diffs as PR comments.
+
+## Backlog
+
+- Clearer diff header than "instance → local", e.g. "Changes push would make to the instance" (and a matching phrasing for git ranges).
