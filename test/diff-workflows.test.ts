@@ -484,3 +484,34 @@ describe('purity', () => {
     expect([before, after]).toEqual(snapshot);
   });
 });
+
+describe('settings equivalent when missing', () => {
+  it('treats a missing binaryMode as "separate"', () => {
+    const before = normalizedFixture('linear.json');
+    const after = { ...before, settings: { ...before.settings, binaryMode: 'separate' } };
+    expect(diffWorkflows(before, after)).toEqual([]);
+    expect(diffWorkflows(after, before)).toEqual([]);
+  });
+
+  it('still reports binaryMode "combined" against a missing value', () => {
+    const before = normalizedFixture('linear.json');
+    const after = { ...before, settings: { ...before.settings, binaryMode: 'combined' } };
+    expect(only(diffWorkflows(before, after))).toMatchObject({
+      kind: 'setting-changed',
+      path: [{ key: 'binaryMode' }],
+      change: { type: 'modified', from: 'separate', to: 'combined' },
+    });
+  });
+
+  it('does not treat a missing executionOrder as v1', () => {
+    const withOrder = normalizedFixture('linear.json');
+    const settings = Object.fromEntries(
+      Object.entries(withOrder.settings ?? {}).filter(([key]) => key !== 'executionOrder'),
+    );
+    const without = { ...withOrder, settings };
+    expect(only(diffWorkflows(without, withOrder))).toMatchObject({
+      kind: 'setting-changed',
+      change: { type: 'added', value: 'v1' },
+    });
+  });
+});

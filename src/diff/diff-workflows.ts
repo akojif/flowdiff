@@ -1,6 +1,7 @@
 import type { NormalizedWorkflow } from '../normalize/normalize.js';
 import { diffConnections } from './connections.js';
 import { diffNodeGroups } from './node-groups.js';
+import { settingsForComparison } from './settings.js';
 import type { Change, NodeRef } from './types.js';
 import { diffValues } from './values.js';
 
@@ -50,7 +51,10 @@ export function diffWorkflows(
     ...diffNodes(before, after, options),
     ...diffConnections(before, after),
     ...diffNodeGroups(before, after),
-    ...diffValues(before.settings ?? {}, after.settings ?? {}).map(({ path, change }): Change => ({
+    ...diffValues(
+      settingsForComparison(before.settings),
+      settingsForComparison(after.settings),
+    ).map(({ path, change }): Change => ({
       kind: 'setting-changed',
       path,
       change,
