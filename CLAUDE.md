@@ -11,6 +11,8 @@ This is a public, open-source portfolio project. Code quality, tests, and the RE
 - `flowdiff pull` – download workflows as normalized JSON, one file per workflow: `workflows/<slug>.<id>.json`
 - `flowdiff status` – per workflow: unchanged / modified locally / modified on instance / conflict
 - `flowdiff diff [workflow]` – readable diff: local vs instance (before = instance, after = local, i.e. what push would change), or between git refs (`main..feature`, no network needed); `--json` (never truncated), `--full`, `--include-layout`, `--exit-code`
+  - Local vs instance: instance-only workflows are "untracked" (one dim summary line; listed with `--all`; always in JSON; ignored by `--exit-code`). A local workflow with a pull record in `.flowdiff/state.json` that is gone from the instance is "deleted on instance", distinct from a new local-only workflow.
+- Tag scope: optional `tag` in `flowdiff.config.json` applies to pull, diff, status and push. Precedence: `--tag <name>` > `--no-tag` > config. Scope = instance workflows with the tag plus every workflow already tracked locally. Git-ref diffs ignore the tag.
 - Exit codes: 0 = success / no changes, 1 = changes found (`--exit-code`) or pull conflicts, 2 = any error
 - `flowdiff push [workflow]` – upload local changes; always shows diff + asks for confirmation; supports `--dry-run`
 
@@ -69,5 +71,7 @@ This is a public, open-source portfolio project. Code quality, tests, and the RE
 2. Diff engine + `diff` command (done when added/removed/renamed/modified nodes and connections are tested)
 3. `status` + `push` with all safety rules above
    - push must not wipe pinData or staticData on the instance; verify how the update endpoint treats missing fields before shipping push.
+   - push must not recreate workflows that are "deleted on instance" (pulled before, now gone) without explicit confirmation.
+   - status and push use the same tag scope as diff (`resolveTagScope`).
 4. Polish: GitHub Action posting diffs as PR comments, hard-coded-secret scanner, README with `vhs` demo, npm publish
    - The GitHub Action must redact values the secret scanner flags before posting diffs as PR comments.
