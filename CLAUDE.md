@@ -10,7 +10,8 @@ This is a public, open-source portfolio project. Code quality, tests, and the RE
 - `flowdiff init` – create `flowdiff.config.json` (instance URL, workflows folder). Never store the API key in config. `FLOWDIFF_URL` overrides the config's instance URL when set.
 - `flowdiff pull` – download workflows as normalized JSON, one file per workflow: `workflows/<slug>.<id>.json`
 - `flowdiff status` – per workflow: unchanged / modified locally / modified on instance / conflict
-- `flowdiff diff [workflow]` – readable diff: local vs instance, or between git refs (`main..feature`); `--json` for machine output
+- `flowdiff diff [workflow]` – readable diff: local vs instance (before = instance, after = local, i.e. what push would change), or between git refs (`main..feature`, no network needed); `--json` (never truncated), `--full`, `--include-layout`, `--exit-code`
+- Exit codes: 0 = success / no changes, 1 = changes found (`--exit-code`) or pull conflicts, 2 = any error
 - `flowdiff push [workflow]` – upload local changes; always shows diff + asks for confirmation; supports `--dry-run`
 
 ## Stack
@@ -30,6 +31,9 @@ This is a public, open-source portfolio project. Code quality, tests, and the RE
   - Deep-compare node `parameters`; report the exact changed field.
   - Connections are keyed by node NAME in n8n – translate through the id mapping.
   - Ignore canvas `position` changes by default (`--include-layout` to show them).
+  - Arrays of objects with unique string `id`s are matched by id (path label = name, or `#id` if names repeat); otherwise by position.
+  - Multi-line strings get a line-level diff. Credentials compare by name; id-only changes are ignored.
+  - `nodeGroups` are diffed in their own section (added/removed/renamed/description/membership).
 - `src/render/` – turn `Change[]` into readable terminal text or JSON.
 - `src/config/` – load `.env`, read/validate `flowdiff.config.json`, resolve the instance URL (env over config) and API key (env only).
 - `src/workspace/` – workflow file naming (`<slug>.<id>.json`) and `.flowdiff/state.json` (content hash + instance `versionId` at last pull).
@@ -66,3 +70,4 @@ This is a public, open-source portfolio project. Code quality, tests, and the RE
 3. `status` + `push` with all safety rules above
    - push must not wipe pinData or staticData on the instance; verify how the update endpoint treats missing fields before shipping push.
 4. Polish: GitHub Action posting diffs as PR comments, hard-coded-secret scanner, README with `vhs` demo, npm publish
+   - The GitHub Action must redact values the secret scanner flags before posting diffs as PR comments.
