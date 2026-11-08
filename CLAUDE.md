@@ -7,7 +7,7 @@ This is a public, open-source portfolio project. Code quality, tests, and the RE
 
 ## Commands (v1)
 
-- `flowdiff init` – create `flowdiff.config.json` (instance URL, workflows folder). Never store the API key in config.
+- `flowdiff init` – create `flowdiff.config.json` (instance URL, workflows folder). Never store the API key in config. `FLOWDIFF_URL` overrides the config's instance URL when set.
 - `flowdiff pull` – download workflows as normalized JSON, one file per workflow: `workflows/<slug>.<id>.json`
 - `flowdiff status` – per workflow: unchanged / modified locally / modified on instance / conflict
 - `flowdiff diff [workflow]` – readable diff: local vs instance, or between git refs (`main..feature`); `--json` for machine output
@@ -31,6 +31,8 @@ This is a public, open-source portfolio project. Code quality, tests, and the RE
   - Connections are keyed by node NAME in n8n – translate through the id mapping.
   - Ignore canvas `position` changes by default (`--include-layout` to show them).
 - `src/render/` – turn `Change[]` into readable terminal text or JSON.
+- `src/config/` – load `.env`, read/validate `flowdiff.config.json`, resolve the instance URL (env over config) and API key (env only).
+- `src/workspace/` – workflow file naming (`<slug>.<id>.json`) and `.flowdiff/state.json` (content hash + instance `versionId` at last pull).
 - `src/commands/` – thin command handlers wiring the above together.
 
 ## n8n API gotchas
@@ -43,7 +45,7 @@ This is a public, open-source portfolio project. Code quality, tests, and the RE
 
 - Development runs against the author's LIVE n8n instance.
 - During development, `push` MUST refuse any workflow that does not have the tag `flowdiff-test`. Do not remove or bypass this guard.
-- Never log, print, or write the API key. Read it only from env: `FLOWDIFF_API_KEY` and `FLOWDIFF_URL` (loaded from `.env`, which is gitignored).
+- Never log, print, or write the API key. Read it only from env: `FLOWDIFF_API_KEY` (loaded from `.env`, which is gitignored). The instance URL comes from `FLOWDIFF_URL` if set, otherwise from `flowdiff.config.json`.
 - Before overwriting a workflow on push, save a backup of the instance version to `.flowdiff/backups/`.
 - Refuse to push if the instance version changed since the last pull, unless `--force`.
 - Never commit real workflows. `workflows/`, `.flowdiff/`, and `.env` are in `.gitignore`.
@@ -62,4 +64,5 @@ This is a public, open-source portfolio project. Code quality, tests, and the RE
 1. `init` + `pull` + normalization (done when two pulls in a row produce no git changes)
 2. Diff engine + `diff` command (done when added/removed/renamed/modified nodes and connections are tested)
 3. `status` + `push` with all safety rules above
+   - push must not wipe pinData or staticData on the instance; verify how the update endpoint treats missing fields before shipping push.
 4. Polish: GitHub Action posting diffs as PR comments, hard-coded-secret scanner, README with `vhs` demo, npm publish
