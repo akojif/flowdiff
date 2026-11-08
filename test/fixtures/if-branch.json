@@ -1,0 +1,98 @@
+{
+  "id": "fixtureIfBranch1",
+  "name": "Fixture: IF Branch",
+  "active": true,
+  "createdAt": "2026-02-01T08:00:00.000Z",
+  "updatedAt": "2026-02-03T16:45:00.000Z",
+  "versionId": "00000000-0000-4000-8000-00000000b001",
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "22222222-2222-4222-8222-000000000001",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 100],
+      "parameters": {
+        "rule": { "interval": [{ "field": "hours" }] }
+      }
+    },
+    {
+      "id": "22222222-2222-4222-8222-000000000002",
+      "name": "Is Active?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [220, 100],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "bbbbbbbb-0000-4000-8000-000000000001",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "active",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "22222222-2222-4222-8222-000000000003",
+      "name": "Mark Active",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [440, 0],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bbbbbbbb-0000-4000-8000-000000000002",
+              "name": "result",
+              "value": "active",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "22222222-2222-4222-8222-000000000004",
+      "name": "Mark Inactive",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [440, 200],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bbbbbbbb-0000-4000-8000-000000000003",
+              "name": "result",
+              "value": "inactive",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Every Hour": {
+      "main": [[{ "node": "Is Active?", "type": "main", "index": 0 }]]
+    },
+    "Is Active?": {
+      "main": [
+        [{ "node": "Mark Active", "type": "main", "index": 0 }],
+        [{ "node": "Mark Inactive", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1", "timezone": "UTC" },
+  "staticData": null,
+  "pinData": {},
+  "tags": []
+}
