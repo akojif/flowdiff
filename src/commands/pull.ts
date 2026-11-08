@@ -5,7 +5,7 @@ import { createClient, type N8nClient } from '../api/client.js';
 import { readConfig, type Config } from '../config/config-file.js';
 import { resolveConnection } from '../config/connection.js';
 import { loadDotEnv, readEnv } from '../config/env.js';
-import { normalizeWorkflow, serializeWorkflow } from '../normalize/index.js';
+import { normalizeWorkflow, serializeWorkflow, unknownTopLevelFields } from '../normalize/index.js';
 import { indexWorkflowFiles, workflowFileName } from '../workspace/paths.js';
 import { hashContent, readState, writeState } from '../workspace/state.js';
 
@@ -35,6 +35,8 @@ export interface PullResult {
   missingOnInstance: string[];
   /** Extra files for the same workflow id, left over from earlier renames. */
   duplicateFiles: string[];
+  /** Top-level fields not on flowdiff's known list, across all pulled workflows. Kept on disk. */
+  unknownFields: string[];
 }
 
 export interface PullOptions {
@@ -68,6 +70,7 @@ export async function pull(options: PullOptions): Promise<PullResult> {
   const state = await readState(cwd);
   const entries: PullEntry[] = [];
   const duplicateFiles: string[] = [];
+  const unknownFields = new Set<string>();
 
   for (const workflow of workflows) {
     const content = serializeWorkflow(normalizeWorkflow(workflow));
@@ -75,6 +78,7 @@ export async function pull(options: PullOptions): Promise<PullResult> {
     const targetFile = workflowFileName(workflow);
     const [currentFile, ...extraFiles] = files.get(workflow.id) ?? [];
     duplicateFiles.push(...extraFiles);
+    for (const field of unknownTopLevelFields(workflow)) unknownFields.add(field);
 
     const local =
       currentFile === undefined ? undefined : await readFile(join(dir, currentFile), 'utf8');
@@ -123,7 +127,7 @@ export async function pull(options: PullOptions): Promise<PullResult> {
       : [];
 
   await writeState(cwd, state);
-  return { entries, missingOnInstance, duplicateFiles };
+  return { entries, missingOnInstance, duplicateFiles, unknownFields: [...unknownFields].sort() };
 }
 
 const OUTCOME_LABELS: Record<PullOutcome, string> = {
@@ -170,6 +174,14 @@ export function formatPullResult(result: PullResult, workflowsDir: string): stri
   for (const file of result.duplicateFiles) {
     lines.push(
       pc.yellow(`${join(workflowsDir, file)} is a duplicate file for the same workflow id.`),
+    );
+  }
+  if (result.unknownFields.length > 0) {
+    lines.push(
+      pc.dim(
+        `Notice: kept unrecognized top-level field(s): ${result.unknownFields.join(', ')}. ` +
+          'If they change without edits, they should be stripped during normalization.',
+      ),
     );
   }
   return lines.join('\n');

@@ -5,6 +5,7 @@ import {
   normalizeWorkflow,
   serializeWorkflow,
   sortKeysDeep,
+  unknownTopLevelFields,
 } from '../src/normalize/index.js';
 import { loadFixture } from './helpers.js';
 
@@ -130,5 +131,16 @@ describe('sortKeysDeep', () => {
     expect(sortKeysDeep('x')).toBe('x');
     expect(sortKeysDeep(null)).toBe(null);
     expect(sortKeysDeep(3)).toBe(3);
+  });
+});
+
+describe('unknownTopLevelFields', () => {
+  it('ignores kept and stripped fields', () => {
+    expect(unknownTopLevelFields(loadFixture('linear.json'))).toEqual([]);
+  });
+
+  it('returns other fields sorted', () => {
+    const workflow = { ...loadFixture('linear.json'), zeta: 1, alpha: 2 };
+    expect(unknownTopLevelFields(workflow)).toEqual(['alpha', 'zeta']);
   });
 });

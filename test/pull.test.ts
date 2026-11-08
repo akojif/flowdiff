@@ -190,3 +190,33 @@ describe('formatPullResult', () => {
     expect(text).toContain('Pulled 3 workflow(s): 3 created.');
   });
 });
+
+describe('unknown top-level fields', () => {
+  it('collects them across workflows and still writes them to disk', async () => {
+    Object.assign(instanceWorkflow('fixtureLinear001'), { description: 'x', folderId: 'f1' });
+    Object.assign(instanceWorkflow('fixtureIfBranch1'), { description: 'y' });
+
+    const result = await pull({ cwd, config, client });
+
+    expect(result.unknownFields).toEqual(['description', 'folderId']);
+    const content = await readFile(workflowPath('fixture-linear.fixtureLinear001.json'), 'utf8');
+    expect(content).toContain('"description": "x"');
+  });
+
+  it('prints a one-line notice naming them', async () => {
+    Object.assign(instanceWorkflow('fixtureLinear001'), { description: 'x' });
+
+    const text = formatPullResult(await pull({ cwd, config, client }), 'workflows');
+    const notices = text.split('\n').filter((line) => line.includes('Notice:'));
+
+    expect(notices).toHaveLength(1);
+    expect(notices[0]).toContain('unrecognized top-level field(s): description.');
+  });
+
+  it('prints no notice when every field is known', async () => {
+    const result = await pull({ cwd, config, client });
+
+    expect(result.unknownFields).toEqual([]);
+    expect(formatPullResult(result, 'workflows')).not.toContain('Notice:');
+  });
+});

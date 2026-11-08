@@ -21,6 +21,30 @@ export const STRIPPED_FIELDS = [
   'pinData',
 ] as const;
 
+/** Top-level fields flowdiff knows about and deliberately keeps. */
+export const KEPT_FIELDS = [
+  'id',
+  'name',
+  'active',
+  'nodes',
+  'connections',
+  'settings',
+  'tags',
+] as const;
+
+const KNOWN_FIELDS = new Set<string>([...KEPT_FIELDS, ...STRIPPED_FIELDS]);
+
+/**
+ * Top-level fields on `workflow` that are neither kept nor stripped on purpose.
+ * They are still written to disk; pull reports them so a field that changes on
+ * its own can be spotted and added to STRIPPED_FIELDS.
+ */
+export function unknownTopLevelFields(workflow: object): string[] {
+  return Object.keys(workflow)
+    .filter((key) => !KNOWN_FIELDS.has(key))
+    .sort();
+}
+
 /** The stable shape stored in git. */
 export interface NormalizedWorkflow {
   id: string;
