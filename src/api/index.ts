@@ -1,2 +1,3 @@
-// Typed client for the n8n public API (/api/v1, X-N8N-API-KEY auth, cursor pagination).
-export {};
+export * from './client.js';
+export * from './errors.js';
+export * from './schemas.js';
