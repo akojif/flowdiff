@@ -11,7 +11,7 @@ interface FixtureWorkflow {
   id: string;
   name: string;
   nodes: FixtureNode[];
-  connections: Record<string, { main: { node: string }[][] }>;
+  connections: Record<string, Record<string, { node: string }[][]>>;
 }
 
 const fixturesDir = join(import.meta.dirname, 'fixtures');
@@ -22,8 +22,14 @@ function loadFixture(file: string): FixtureWorkflow {
 }
 
 describe('test fixtures', () => {
-  it('includes the three expected fixtures', () => {
-    expect(fixtureFiles.sort()).toEqual(['credential-ref.json', 'if-branch.json', 'linear.json']);
+  it('includes the expected fixtures', () => {
+    expect(fixtureFiles.sort()).toEqual([
+      'code-node.json',
+      'credential-ref.json',
+      'if-branch.json',
+      'linear.json',
+      'node-groups.json',
+    ]);
   });
 
   describe.each(fixtureFiles)('%s', (file) => {
@@ -46,7 +52,7 @@ describe('test fixtures', () => {
       const names = new Set(workflow.nodes.map((node) => node.name));
       for (const [source, outputs] of Object.entries(workflow.connections)) {
         expect(names).toContain(source);
-        for (const target of outputs.main.flat()) {
+        for (const target of Object.values(outputs).flat(2)) {
           expect(names).toContain(target.node);
         }
       }

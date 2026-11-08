@@ -1,0 +1,58 @@
+{
+  "id": "fixtureGroups001",
+  "name": "Fixture: Node Groups",
+  "active": false,
+  "createdAt": "2026-05-01T09:00:00.000Z",
+  "updatedAt": "2026-05-01T09:30:00.000Z",
+  "versionId": "00000000-0000-4000-8000-00000000e001",
+  "activeVersion": null,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "55555555-5555-4555-8555-000000000001",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "parameters": {}
+    },
+    {
+      "id": "55555555-5555-4555-8555-000000000002",
+      "name": "Load Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0],
+      "parameters": { "method": "GET", "url": "https://api.example.com/data", "options": {} }
+    },
+    {
+      "id": "55555555-5555-4555-8555-000000000003",
+      "name": "Clean Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [440, 0],
+      "parameters": { "options": {} }
+    }
+  ],
+  "connections": {
+    "Start": { "main": [[{ "node": "Load Data", "type": "main", "index": 0 }]] },
+    "Load Data": { "main": [[{ "node": "Clean Data", "type": "main", "index": 0 }]] }
+  },
+  "nodeGroups": [
+    {
+      "id": "group-fake-0001",
+      "name": "Fetch",
+      "description": "Loads data from the example API.",
+      "nodeIds": { "55555555-5555-4555-8555-000000000002": true }
+    },
+    {
+      "id": "group-fake-0002",
+      "name": "Prepare",
+      "description": "Cleans the loaded data.",
+      "nodeIds": { "55555555-5555-4555-8555-000000000003": true }
+    }
+  ],
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "pinData": {},
+  "tags": []
+}

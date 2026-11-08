@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { N8nClient } from '../src/api/client.js';
 import { workflowSchema, type ApiWorkflow } from '../src/api/schemas.js';
+import { normalizeWorkflow, type NormalizedWorkflow } from '../src/normalize/normalize.js';
 
 export function loadFixture(name: string): ApiWorkflow {
   const raw: unknown = JSON.parse(
@@ -31,4 +32,26 @@ export function fakeClient(workflows: ApiWorkflow[]): N8nClient & { workflows: A
         : Promise.resolve(structuredClone(workflow));
     },
   };
+}
+
+/** A normalized fixture, freshly cloned so tests can modify it. */
+export function normalizedFixture(name: string): NormalizedWorkflow {
+  return normalizeWorkflow(loadFixture(name));
+}
+
+/** Finds a node by name, failing the test if it does not exist. */
+export function nodeNamed(
+  workflow: NormalizedWorkflow,
+  name: string,
+): NormalizedWorkflow['nodes'][number] {
+  const node = workflow.nodes.find((n) => n.name === name);
+  if (node === undefined) throw new Error(`no node named ${name}`);
+  return node;
+}
+
+/** `items[index]`, failing the test instead of returning undefined. */
+export function at<T>(items: readonly T[], index: number): T {
+  const item = items[index];
+  if (item === undefined) throw new Error(`no item at index ${String(index)}`);
+  return item;
 }

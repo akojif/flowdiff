@@ -1,0 +1,72 @@
+{
+  "id": "fixtureCodeNode1",
+  "name": "Fixture: Code and AI",
+  "active": false,
+  "createdAt": "2026-04-01T09:00:00.000Z",
+  "updatedAt": "2026-04-02T10:00:00.000Z",
+  "versionId": "00000000-0000-4000-8000-00000000d001",
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "44444444-4444-4444-8444-000000000001",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "parameters": {}
+    },
+    {
+      "id": "44444444-4444-4444-8444-000000000002",
+      "name": "Transform Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0],
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nfor (const item of items) {\n  item.json.total = item.json.price * item.json.quantity;\n}\n\nreturn items;\n"
+      }
+    },
+    {
+      "id": "44444444-4444-4444-8444-000000000003",
+      "name": "Summarize",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [440, 0],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.total }}",
+        "options": {
+          "systemMessage": "You are a helpful assistant.\nSummarize the order in one sentence.\nNever include personal data."
+        }
+      }
+    },
+    {
+      "id": "44444444-4444-4444-8444-000000000004",
+      "name": "Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [440, 220],
+      "parameters": {
+        "model": { "__rl": true, "mode": "list", "value": "gpt-4o-mini" },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": { "id": "credFakeId000002", "name": "Example OpenAI Account" }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{ "node": "Transform Items", "type": "main", "index": 0 }]]
+    },
+    "Transform Items": {
+      "main": [[{ "node": "Summarize", "type": "main", "index": 0 }]]
+    },
+    "Chat Model": {
+      "ai_languageModel": [[{ "node": "Summarize", "type": "ai_languageModel", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "pinData": {},
+  "tags": []
+}
