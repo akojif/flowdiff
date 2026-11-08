@@ -1,20 +1,12 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { workflowSchema, type ApiWorkflow } from '../src/api/schemas.js';
+import type { ApiWorkflow } from '../src/api/schemas.js';
 import {
   STRIPPED_FIELDS,
   normalizeWorkflow,
   serializeWorkflow,
   sortKeysDeep,
 } from '../src/normalize/index.js';
-
-function loadFixture(name: string): ApiWorkflow {
-  const raw: unknown = JSON.parse(
-    readFileSync(join(import.meta.dirname, 'fixtures', name), 'utf8'),
-  );
-  return workflowSchema.parse(raw);
-}
+import { loadFixture } from './helpers.js';
 
 const FIXTURES = ['linear.json', 'if-branch.json', 'credential-ref.json'];
 
