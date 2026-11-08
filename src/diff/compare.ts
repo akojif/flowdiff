@@ -2,7 +2,15 @@ import type { NormalizedWorkflow } from '../normalize/normalize.js';
 import { diffWorkflows, type DiffOptions } from './diff-workflows.js';
 import type { Change } from './types.js';
 
-export type ComparisonStatus = 'changed' | 'unchanged' | 'only-before' | 'only-after';
+export type ComparisonStatus =
+  | 'changed'
+  | 'unchanged'
+  | 'only-before'
+  | 'only-after'
+  /** Local vs instance: on the instance but not pulled. Push never touches these. */
+  | 'untracked'
+  /** Local vs instance: pulled before, but no longer on the instance. */
+  | 'deleted-on-instance';
 
 export interface WorkflowComparison {
   id: string;
@@ -42,9 +50,14 @@ export function compareWorkflowSets(
   return comparisons.sort((x, y) => compare(x.name, y.name) || compare(x.id, y.id));
 }
 
-/** True if any workflow differs, including workflows present on only one side. */
+/**
+ * True if any workflow differs, including workflows present on only one side.
+ * Untracked workflows do not count: push would never touch them.
+ */
 export function hasDifferences(comparisons: WorkflowComparison[]): boolean {
-  return comparisons.some((comparison) => comparison.status !== 'unchanged');
+  return comparisons.some(
+    (comparison) => comparison.status !== 'unchanged' && comparison.status !== 'untracked',
+  );
 }
 
 function compare(a: string, b: string): number {

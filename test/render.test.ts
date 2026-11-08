@@ -148,6 +148,58 @@ describe('renderText', () => {
     `);
   });
 
+  describe('local vs instance statuses', () => {
+    const linear = normalizedFixture('linear.json');
+    const comparisons: WorkflowComparison[] = [
+      {
+        id: 'fixtureLinear001',
+        name: 'Fixture: Linear',
+        status: 'deleted-on-instance',
+        changes: [],
+      },
+      { id: 'untracked0000001', name: 'Untracked One', status: 'untracked', changes: [] },
+      { id: 'untracked0000002', name: 'Untracked Two', status: 'untracked', changes: [] },
+      ...compareOne(linear, linear),
+    ];
+
+    it('collapses untracked workflows into one line by default', () => {
+      expect(renderText(comparisons, options)).toMatchInlineSnapshot(`
+        "instance → local
+
+        ! Fixture: Linear (fixtureLinear001)  deleted on instance
+
+        0 changed, 1 unchanged, 1 deleted on instance.
+        2 workflows on the instance aren't tracked locally (run flowdiff pull to add them)"
+      `);
+    });
+
+    it('lists untracked workflows individually with showAll', () => {
+      expect(renderText(comparisons, { ...options, showAll: true })).toMatchInlineSnapshot(`
+        "instance → local
+
+        ! Fixture: Linear (fixtureLinear001)  deleted on instance
+
+        0 changed, 1 unchanged, 1 deleted on instance.
+        2 workflows on the instance aren't tracked locally (run flowdiff pull to add them):
+          ? Untracked One (untracked0000001)
+          ? Untracked Two (untracked0000002)"
+      `);
+    });
+
+    it('uses the singular for one untracked workflow and still reports no changes', () => {
+      const one: WorkflowComparison[] = [
+        { id: 'untracked0000001', name: 'Untracked One', status: 'untracked', changes: [] },
+        ...compareOne(linear, linear),
+      ];
+      expect(renderText(one, options)).toMatchInlineSnapshot(`
+        "instance → local
+
+        No changes (1 unchanged).
+        1 workflow on the instance isn't tracked locally (run flowdiff pull to add them)"
+      `);
+    });
+  });
+
   it('says so when nothing changed', () => {
     const linear = normalizedFixture('linear.json');
     expect(renderText(compareOne(linear, linear), options)).toMatchInlineSnapshot(`

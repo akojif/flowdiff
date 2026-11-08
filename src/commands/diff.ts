@@ -4,15 +4,21 @@ import { createClient, type N8nClient } from '../api/client.js';
 import { readConfig, type Config } from '../config/config-file.js';
 import { resolveConnection } from '../config/connection.js';
 import { loadDotEnv, readEnv } from '../config/env.js';
-import { compareWorkflowSets, hasDifferences } from '../diff/index.js';
+import { resolveTagScope } from '../config/tag-scope.js';
+import { compareWorkflowSets, hasDifferences, type WorkflowComparison } from '../diff/index.js';
 import { FlowdiffError } from '../errors.js';
 import { normalizeWorkflow, type NormalizedWorkflow } from '../normalize/normalize.js';
 import { renderJson, renderText } from '../render/index.js';
 import { parseRange, readWorkflowsAtRef, refExists } from '../workspace/git.js';
 import { readLocalWorkflows, type WorkflowFile } from '../workspace/local-files.js';
 import { slugify } from '../workspace/paths.js';
+import { readState } from '../workspace/state.js';
 
 export interface DiffFlags {
+  /** `--tag <name>` (string) or `--no-tag` (false). Ignored for git ranges. */
+  tag?: string | false;
+  /** List untracked instance workflows individually. */
+  all?: boolean;
   json?: boolean;
   includeLayout?: boolean;
   full?: boolean;
@@ -38,12 +44,15 @@ export interface DiffCommandResult {
 }
 
 interface Sides {
+  mode: 'instance' | 'git';
   before: Map<string, NormalizedWorkflow>;
   after: Map<string, NormalizedWorkflow>;
   beforeLabel: string;
   afterLabel: string;
   /** File paths per workflow id, from either side, for selector matching. */
   files: Map<string, string[]>;
+  /** Workflow ids with a pull record in .flowdiff/state.json (instance mode only). */
+  pulledIds: Set<string>;
 }
 
 /**
@@ -68,7 +77,8 @@ export async function diffCommand(options: DiffCommandOptions): Promise<DiffComm
         `Unexpected argument "${workflow}". Use \`flowdiff diff [workflow]\` or \`flowdiff diff <refA>..<refB> [workflow]\`.`,
       );
     }
-    sides = await instanceSides(cwd, config, options.getClient());
+    const scope = resolveTagScope(config, flags.tag);
+    sides = await instanceSides(cwd, config, options.getClient(), scope.tag);
     selector = target;
   }
 
@@ -80,12 +90,17 @@ export async function diffCommand(options: DiffCommandOptions): Promise<DiffComm
 
   const comparisons = compareWorkflowSets(sides.before, sides.after, {
     includeLayout: flags.includeLayout === true,
-  });
+  }).map((comparison) => relabel(comparison, sides));
   const labels = { beforeLabel: sides.beforeLabel, afterLabel: sides.afterLabel };
   const output =
     flags.json === true
       ? renderJson(comparisons, labels)
-      : renderText(comparisons, { ...labels, color: options.color, full: flags.full === true });
+      : renderText(comparisons, {
+          ...labels,
+          color: options.color,
+          full: flags.full === true,
+          showAll: flags.all === true,
+        });
   return { output, differs: hasDifferences(comparisons) };
 }
 
@@ -93,26 +108,59 @@ async function gitSides(cwd: string, config: Config, from: string, to: string): 
   const before = await readWorkflowsAtRef(cwd, from, config.workflowsDir);
   const after = await readWorkflowsAtRef(cwd, to, config.workflowsDir);
   return {
+    mode: 'git',
     before: workflowsOf(before),
     after: workflowsOf(after),
     beforeLabel: from,
     afterLabel: to,
     files: filesOf(before, after),
+    pulledIds: new Set(),
   };
 }
 
-async function instanceSides(cwd: string, config: Config, client: N8nClient): Promise<Sides> {
+/**
+ * Instance side = workflows with the tag (if any) plus every workflow already
+ * tracked locally, so removing the tag on the instance shows up as a tag change
+ * instead of the local file looking like a new workflow.
+ */
+async function instanceSides(
+  cwd: string,
+  config: Config,
+  client: N8nClient,
+  tag: string | undefined,
+): Promise<Sides> {
   const local = await readLocalWorkflows(cwd, config.workflowsDir);
+  const state = await readState(cwd);
   const remote = (await client.listWorkflows())
     .filter((workflow) => workflow.isArchived !== true)
+    .filter(
+      (workflow) =>
+        tag === undefined || local.has(workflow.id) || workflow.tags?.some((t) => t.name === tag),
+    )
     .map(normalizeWorkflow);
   return {
+    mode: 'instance',
     before: new Map(remote.map((workflow) => [workflow.id, workflow])),
     after: workflowsOf(local),
     beforeLabel: 'instance',
     afterLabel: 'local',
     files: filesOf(local),
+    pulledIds: new Set(Object.keys(state.workflows)),
   };
+}
+
+/**
+ * In instance mode, a workflow only on the instance is "untracked" (push never
+ * deletes, so it is not a removal), and a local workflow that was pulled before
+ * but is gone from the instance is "deleted on instance", not a new workflow.
+ */
+function relabel(comparison: WorkflowComparison, sides: Sides): WorkflowComparison {
+  if (sides.mode !== 'instance') return comparison;
+  if (comparison.status === 'only-before') return { ...comparison, status: 'untracked' };
+  if (comparison.status === 'only-after' && sides.pulledIds.has(comparison.id)) {
+    return { ...comparison, status: 'deleted-on-instance' };
+  }
+  return comparison;
 }
 
 function workflowsOf(files: Map<string, WorkflowFile>): Map<string, NormalizedWorkflow> {

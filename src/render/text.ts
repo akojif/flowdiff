@@ -1,6 +1,6 @@
 import { createColors } from 'picocolors';
 import type { Change, ConnectionRef, ValueChange, WorkflowComparison } from '../diff/index.js';
-import { formatPath } from '../diff/index.js';
+import { formatPath, hasDifferences } from '../diff/index.js';
 
 export const DEFAULT_MAX_VALUE_LENGTH = 80;
 
@@ -11,6 +11,8 @@ export interface TextRenderOptions {
   color: boolean;
   /** Show long single-line values in full instead of truncating them. */
   full: boolean;
+  /** List untracked instance workflows individually instead of one summary line. */
+  showAll?: boolean;
   maxValueLength?: number;
 }
 
@@ -25,12 +27,16 @@ export function renderText(comparisons: WorkflowComparison[], options: TextRende
     const title = `${comparison.name} ${c.dim(`(${comparison.id})`)}`;
     switch (comparison.status) {
       case 'unchanged':
+      case 'untracked':
         break;
       case 'only-after':
         lines.push(`${c.green('+')} ${title}  ${c.dim(`only in ${options.afterLabel}`)}`, '');
         break;
       case 'only-before':
         lines.push(`${c.red('-')} ${title}  ${c.dim(`only in ${options.beforeLabel}`)}`, '');
+        break;
+      case 'deleted-on-instance':
+        lines.push(`${c.red('!')} ${title}  ${c.red('deleted on instance')}`, '');
         break;
       case 'changed':
         lines.push(`${c.yellow('~')} ${c.bold(title)}`);
@@ -43,22 +49,47 @@ export function renderText(comparisons: WorkflowComparison[], options: TextRende
   }
 
   lines.push(summary(comparisons, options));
+  lines.push(...untrackedLines(comparisons, c, options));
   return lines.join('\n');
+}
+
+/**
+ * Workflows on the instance that are not tracked locally: one dim line by
+ * default, listed individually with `showAll`. They are never shown as removals,
+ * because push never deletes.
+ */
+function untrackedLines(
+  comparisons: WorkflowComparison[],
+  c: Colors,
+  options: TextRenderOptions,
+): string[] {
+  const untracked = comparisons.filter((comparison) => comparison.status === 'untracked');
+  if (untracked.length === 0) return [];
+
+  const count = untracked.length;
+  const noun = count === 1 ? 'workflow' : 'workflows';
+  const verb = count === 1 ? "isn't" : "aren't";
+  const headline = `${String(count)} ${noun} on the instance ${verb} tracked locally (run flowdiff pull to add them)`;
+  if (options.showAll !== true) return [c.dim(headline)];
+  return [
+    c.dim(`${headline}:`),
+    ...untracked.map((comparison) => c.dim(`  ? ${comparison.name} (${comparison.id})`)),
+  ];
 }
 
 function summary(comparisons: WorkflowComparison[], options: TextRenderOptions): string {
   const count = (status: WorkflowComparison['status']) =>
     comparisons.filter((comparison) => comparison.status === status).length;
+  const optional = (status: WorkflowComparison['status'], label: string) =>
+    count(status) > 0 ? `${String(count(status))} ${label}` : '';
   const parts = [
     `${String(count('changed'))} changed`,
     `${String(count('unchanged'))} unchanged`,
-    count('only-after') > 0 ? `${String(count('only-after'))} only in ${options.afterLabel}` : '',
-    count('only-before') > 0
-      ? `${String(count('only-before'))} only in ${options.beforeLabel}`
-      : '',
+    optional('only-after', `only in ${options.afterLabel}`),
+    optional('only-before', `only in ${options.beforeLabel}`),
+    optional('deleted-on-instance', 'deleted on instance'),
   ].filter(Boolean);
-  const differs = comparisons.some((comparison) => comparison.status !== 'unchanged');
-  return differs ? `${parts.join(', ')}.` : `No changes (${parts[1] ?? ''}).`;
+  return hasDifferences(comparisons) ? `${parts.join(', ')}.` : `No changes (${parts[1] ?? ''}).`;
 }
 
 const LABEL_WIDTH = 8;

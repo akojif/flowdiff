@@ -60,10 +60,61 @@ describe('local vs instance', () => {
     expect(result.output).toContain('status  inactive → active');
   });
 
-  it('lists workflows that exist only on the instance', async () => {
+  it('collapses untracked instance workflows into one dim line', async () => {
+    await rm(join(cwd, LINEAR_FILE));
+
+    const result = await run();
+
+    expect(result.output).toContain(
+      "1 workflow on the instance isn't tracked locally (run flowdiff pull to add them)",
+    );
+    expect(result.output).not.toContain('Fixture: Linear');
+    expect(result.output).not.toContain('only in instance');
+  });
+
+  it('lists untracked workflows individually with --all', async () => {
+    await rm(join(cwd, LINEAR_FILE));
+    const result = await run({ flags: { all: true } });
+    expect(result.output).toContain('  ? Fixture: Linear (fixtureLinear001)');
+  });
+
+  it('does not count untracked workflows as differences', async () => {
     await rm(join(cwd, LINEAR_FILE));
     const result = await run();
-    expect(result.output).toContain('Fixture: Linear (fixtureLinear001)  only in instance');
+    expect(result.differs).toBe(false);
+    expect(result.output).toContain('No changes (2 unchanged).');
+  });
+
+  it('always lists untracked workflows in JSON', async () => {
+    await rm(join(cwd, LINEAR_FILE));
+    const parsed = JSON.parse((await run({ flags: { json: true } })).output) as {
+      workflows: { id: string; status: string }[];
+    };
+    expect(parsed.workflows.find((w) => w.id === 'fixtureLinear001')?.status).toBe('untracked');
+  });
+
+  it('shows a pulled workflow that is gone from the instance as deleted on instance', async () => {
+    client.workflows = client.workflows.filter((w) => w.id !== 'fixtureLinear001');
+
+    const result = await run();
+
+    expect(result.output).toContain('! Fixture: Linear (fixtureLinear001)  deleted on instance');
+    expect(result.output).toContain('1 deleted on instance');
+    expect(result.output).not.toContain('only in local');
+    expect(result.differs).toBe(true);
+  });
+
+  it('shows a new local workflow with no pull record as only in local', async () => {
+    const newFile = join(cwd, 'workflows', 'brand-new.newLocalId0001.json');
+    const content = (await readFile(join(cwd, LINEAR_FILE), 'utf8'))
+      .replace('"fixtureLinear001"', '"newLocalId0001"')
+      .replace('"Fixture: Linear"', '"Brand New"');
+    await writeFile(newFile, content);
+
+    const result = await run();
+
+    expect(result.output).toContain('+ Brand New (newLocalId0001)  only in local');
+    expect(result.output).not.toContain('deleted on instance');
   });
 
   it('outputs JSON with --json', async () => {
@@ -118,6 +169,48 @@ describe('local vs instance', () => {
     await expect(run()).rejects.toThrow(
       /workflows\/fixture-linear\.fixtureLinear001\.json is not a valid workflow file: name:/,
     );
+  });
+});
+
+describe('tag scope', () => {
+  // Fresh project that pulled only the flowdiff-test workflows (linear and credential-ref).
+  beforeEach(async () => {
+    cwd = await mkdtemp(join(tmpdir(), 'flowdiff-diff-tag-'));
+    await writeConfig(cwd, { ...config, tag: 'flowdiff-test' });
+    await pull({ cwd, config, client, tag: 'flowdiff-test' });
+  });
+
+  const runTagged = (overrides: Partial<DiffCommandOptions> = {}) =>
+    run({ config: { ...config, tag: 'flowdiff-test' }, ...overrides });
+
+  it('only considers tagged workflows when the config has a tag', async () => {
+    const result = await runTagged();
+    expect(result.output).toContain('No changes (2 unchanged).');
+    expect(result.output).not.toContain('tracked locally');
+  });
+
+  it('counts untagged workflows as untracked with --no-tag', async () => {
+    const result = await runTagged({ flags: { tag: false } });
+    expect(result.output).toContain("1 workflow on the instance isn't tracked locally");
+  });
+
+  it('lets --tag override the saved tag', async () => {
+    const result = await runTagged({ flags: { tag: 'some-other-tag', json: true } });
+    const parsed = JSON.parse(result.output) as { workflows: { status: string }[] };
+    // Tracked workflows stay in scope even without the tag; nothing else matches.
+    expect(parsed.workflows.map((w) => w.status)).toEqual(['unchanged', 'unchanged']);
+  });
+
+  it('shows a tag removed on the instance as a tag change, not as a new local workflow', async () => {
+    const linear = client.workflows.find((w) => w.id === 'fixtureLinear001');
+    if (linear === undefined) throw new Error('missing fixture');
+    linear.tags = [];
+
+    const result = await runTagged();
+
+    expect(result.output).toContain('~ Fixture: Linear (fixtureLinear001)');
+    expect(result.output).toContain('+ tag     flowdiff-test');
+    expect(result.output).not.toContain('only in local');
   });
 });
 
@@ -177,6 +270,16 @@ describe('between git refs', () => {
     });
 
     expect(result.differs).toBe(false);
+  });
+
+  it('still shows a file deleted between refs as a removal', async () => {
+    await rm(join(cwd, LINEAR_FILE));
+    git('commit', '--quiet', '-am', 'delete');
+
+    const result = await run({ target: 'main..feature', getClient: noClient });
+
+    expect(result.output).toContain('- Fixture: Linear (fixtureLinear001)  only in main');
+    expect(result.differs).toBe(true);
   });
 
   it('reports an unknown ref', async () => {

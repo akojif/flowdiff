@@ -35,6 +35,9 @@ program
   .description(
     'show changes between the instance and local files (instance → local), or between two git refs',
   )
+  .option('--tag <name>', 'only compare workflows with this tag (overrides the saved tag)')
+  .option('--no-tag', 'ignore the tag saved in flowdiff.config.json for this run')
+  .option('--all', 'list untracked instance workflows individually')
   .option('--json', 'machine-readable output (never truncated)')
   .option('--include-layout', 'also show node position changes')
   .option('--full', 'show long values in full instead of truncating them')
