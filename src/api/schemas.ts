@@ -10,7 +10,7 @@ const connectionSchema = z.looseObject({
 });
 
 // connections[sourceNodeName][connectionType][outputIndex] -> targets
-const connectionsSchema = z.record(
+export const connectionsSchema = z.record(
   z.string(),
   z.record(z.string(), z.array(z.array(connectionSchema).nullable())),
 );
@@ -20,7 +20,7 @@ const credentialRefSchema = z.looseObject({
   name: z.string(),
 });
 
-const nodeSchema = z.looseObject({
+export const nodeSchema = z.looseObject({
   id: z.string(),
   name: z.string(),
   type: z.string(),
