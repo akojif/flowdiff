@@ -10,6 +10,8 @@ export const CONFIG_FILE_NAME = 'flowdiff.config.json';
 export const configSchema = z.strictObject({
   instanceUrl: z.url({ protocol: /^https?$/ }),
   workflowsDir: z.string().min(1).default('workflows'),
+  /** Only track workflows with this tag. Applies to pull, diff, status and push. */
+  tag: z.string().trim().min(1).optional(),
 });
 
 export type Config = z.infer<typeof configSchema>;

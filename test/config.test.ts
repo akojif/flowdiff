@@ -74,6 +74,18 @@ describe('config file', () => {
     });
   });
 
+  it('reads an optional tag and rejects an empty one', async () => {
+    const dir = await tempDir();
+    await writeConfig(dir, { ...config, tag: 'flowdiff-test' });
+    await expect(readConfig(dir)).resolves.toMatchObject({ tag: 'flowdiff-test' });
+
+    await writeFile(
+      join(dir, 'flowdiff.config.json'),
+      '{"instanceUrl":"https://n8n.example.com","tag":"  "}',
+    );
+    await expect(readConfig(dir)).rejects.toThrow(/tag/);
+  });
+
   it('tells the user to run init when the file is missing', async () => {
     await expect(readConfig(await tempDir())).rejects.toThrow(/Run `flowdiff init` first/);
   });
