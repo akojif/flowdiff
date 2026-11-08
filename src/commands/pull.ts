@@ -2,9 +2,11 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import pc from 'picocolors';
 import { createClient, type N8nClient } from '../api/client.js';
-import { readConfig, type Config } from '../config/config-file.js';
+import { confirm } from '@clack/prompts';
+import { CONFIG_FILE_NAME, readConfig, writeConfig, type Config } from '../config/config-file.js';
 import { resolveConnection } from '../config/connection.js';
 import { loadDotEnv, readEnv } from '../config/env.js';
+import { describeTagScope, resolveTagScope } from '../config/tag-scope.js';
 import { normalizeWorkflow, serializeWorkflow, unknownTopLevelFields } from '../normalize/index.js';
 import { indexWorkflowFiles, workflowFileName } from '../workspace/paths.js';
 import { hashContent, readState, writeState } from '../workspace/state.js';
@@ -187,27 +189,62 @@ export function formatPullResult(result: PullResult, workflowsDir: string): stri
   return lines.join('\n');
 }
 
+/**
+ * Returns the tag to offer saving to the config after `pull --tag`, or
+ * undefined when there is nothing to offer (no --tag, or it is already saved).
+ */
+export function tagToOffer(
+  config: Config,
+  flagTag: string | false | undefined,
+): string | undefined {
+  return typeof flagTag === 'string' && flagTag !== config.tag ? flagTag : undefined;
+}
+
+async function offerToSaveTag(cwd: string, config: Config, tag: string): Promise<void> {
+  const interactive = process.stdin.isTTY && process.stdout.isTTY;
+  if (!interactive) {
+    console.log(
+      pc.dim(
+        `Tip: add "tag": "${tag}" to ${CONFIG_FILE_NAME} so diff, status and push use it too.`,
+      ),
+    );
+    return;
+  }
+  const message =
+    config.tag === undefined
+      ? `Save tag "${tag}" to ${CONFIG_FILE_NAME} so diff, status and push use it too?`
+      : `Replace the saved tag "${config.tag}" with "${tag}" in ${CONFIG_FILE_NAME}?`;
+  const save = await confirm({ message, initialValue: config.tag === undefined });
+  if (save === true) {
+    await writeConfig(cwd, { ...config, tag });
+    console.log(pc.dim(`Saved tag "${tag}" to ${CONFIG_FILE_NAME}.`));
+  }
+}
+
 /** CLI entry point for `flowdiff pull`. */
 export async function runPull(
   cwd: string,
-  flags: { tag?: string; force?: boolean },
+  flags: { tag?: string | false; force?: boolean },
 ): Promise<void> {
   loadDotEnv(cwd);
   const config = await readConfig(cwd);
   const connection = resolveConnection(config, readEnv());
   const client = createClient({ connection });
+  const scope = resolveTagScope(config, flags.tag);
 
-  const filter = flags.tag === undefined ? '' : ` with tag "${flags.tag}"`;
   console.log(
     pc.dim(
-      `Pulling workflows${filter} from ${connection.instanceUrl} (from ${connection.urlSource})`,
+      `Pulling workflows${describeTagScope(scope)} from ${connection.instanceUrl} (from ${connection.urlSource})`,
     ),
   );
 
-  const result = await pull({ cwd, config, client, tag: flags.tag, force: flags.force });
+  const result = await pull({ cwd, config, client, tag: scope.tag, force: flags.force });
   console.log(formatPullResult(result, config.workflowsDir));
 
   if (result.entries.some((entry) => entry.outcome === 'conflict')) {
     process.exitCode = 1;
   }
+
+  const offer = tagToOffer(config, flags.tag);
+  if (offer !== undefined) await offerToSaveTag(cwd, config, offer);
 }

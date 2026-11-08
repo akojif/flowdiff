@@ -23,9 +23,10 @@ program
 program
   .command('pull')
   .description('download workflows as normalized JSON, one file per workflow')
-  .option('--tag <name>', 'only pull workflows with this tag')
+  .option('--tag <name>', 'only pull workflows with this tag (overrides the saved tag)')
+  .option('--no-tag', 'ignore the tag saved in flowdiff.config.json for this run')
   .option('--force', 'overwrite local edits even if the workflow changed on the instance')
-  .action(async (flags: { tag?: string; force?: boolean }) => {
+  .action(async (flags: { tag?: string | false; force?: boolean }) => {
     await runPull(process.cwd(), flags);
   });
 

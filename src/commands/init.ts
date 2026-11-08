@@ -80,7 +80,15 @@ export async function runInit(cwd: string): Promise<void> {
     }),
   ).trim();
 
-  await writeConfig(cwd, { instanceUrl, workflowsDir });
+  const tag = exitIfCancelled(
+    await p.text({
+      message: 'Only track workflows with this tag? (leave empty for all)',
+      placeholder: 'e.g. flowdiff',
+      defaultValue: '',
+    }),
+  ).trim();
+
+  await writeConfig(cwd, { instanceUrl, workflowsDir, ...(tag === '' ? {} : { tag }) });
   p.log.success(`Wrote ${CONFIG_FILE_NAME}`);
 
   const gitignorePath = join(cwd, '.gitignore');

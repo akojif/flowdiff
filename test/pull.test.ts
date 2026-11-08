@@ -2,7 +2,7 @@ import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { formatPullResult, pull, type PullResult } from '../src/commands/pull.js';
+import { formatPullResult, pull, tagToOffer, type PullResult } from '../src/commands/pull.js';
 import type { Config } from '../src/config/config-file.js';
 import { fakeClient, loadAllFixtures } from './helpers.js';
 
@@ -218,5 +218,21 @@ describe('unknown top-level fields', () => {
 
     expect(result.unknownFields).toEqual([]);
     expect(formatPullResult(result, 'workflows')).not.toContain('Notice:');
+  });
+});
+
+describe('tagToOffer', () => {
+  it('offers to save a --tag that is not saved yet', () => {
+    expect(tagToOffer(config, 'flowdiff-test')).toBe('flowdiff-test');
+  });
+
+  it('offers to replace a different saved tag', () => {
+    expect(tagToOffer({ ...config, tag: 'old' }, 'new')).toBe('new');
+  });
+
+  it('offers nothing when the tag is already saved, absent, or turned off', () => {
+    expect(tagToOffer({ ...config, tag: 'same' }, 'same')).toBeUndefined();
+    expect(tagToOffer(config, undefined)).toBeUndefined();
+    expect(tagToOffer({ ...config, tag: 'saved' }, false)).toBeUndefined();
   });
 });
