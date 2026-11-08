@@ -43,5 +43,11 @@
     "typescript-eslint": "^8.72.1",
     "vite": "^8.3.6",
     "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.8.1",
+    "commander": "^15.1.0",
+    "picocolors": "^1.1.1",
+    "zod": "^4.6.7"
   }
 }
