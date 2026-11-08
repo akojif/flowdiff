@@ -1,0 +1,19 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Secrets: the API key and URL live only in .env
+.env
+.env.*
+!.env.example
+
+# Real workflows and local flowdiff state must never be committed
+workflows/
+.flowdiff/
+
+# Logs and OS files
+*.log
+npm-debug.log*
+.DS_Store
