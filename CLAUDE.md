@@ -36,6 +36,8 @@ This is a public, open-source portfolio project. Code quality, tests, and the RE
   - Arrays of objects with unique string `id`s are matched by id (path label = name, or `#id` if names repeat); otherwise by position.
   - Multi-line strings get a line-level diff. Credentials compare by name; id-only changes are ignored.
   - `nodeGroups` are diffed in their own section (added/removed/renamed/description/membership).
+  - Settings equivalent when missing (`src/diff/settings.ts`, currently only `binaryMode` = "separate") compare as equal. Add entries only after confirming n8n's runtime behaviour.
+  - A parameter key present on one side only, with a scalar or empty value, is labelled `possibleDefault` (the n8n editor strips defaults on save). Never hidden: shown after real changes and counted separately.
 - `src/render/` – turn `Change[]` into readable terminal text or JSON.
 - `src/config/` – load `.env`, read/validate `flowdiff.config.json`, resolve the instance URL (env over config) and API key (env only).
 - `src/workspace/` – workflow file naming (`<slug>.<id>.json`) and `.flowdiff/state.json` (content hash + instance `versionId` at last pull).
@@ -79,3 +81,4 @@ This is a public, open-source portfolio project. Code quality, tests, and the RE
 ## Backlog
 
 - Clearer diff header than "instance → local", e.g. "Changes push would make to the instance" (and a matching phrasing for git ranges).
+- Opt-in node defaults cache: `flowdiff defaults fetch --n8n-version <v>` downloads `n8n-nodes-base@<v>`'s `dist/types/nodes.json` from npm into `.flowdiff/cache/` (gitignored, never bundled: that data is under n8n's Sustainable Use License, and flowdiff stays MIT). A parameter missing on one side and equal to its declared default for that node type/version on the other would then not count as a change. Unknown type/version: show the change. Note: npm's `latest` tag for n8n-nodes-base is stale; use the version matching the instance (e.g. the `stable` tag).
