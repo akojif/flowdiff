@@ -38,19 +38,40 @@ export function renderText(comparisons: WorkflowComparison[], options: TextRende
       case 'deleted-on-instance':
         lines.push(`${c.red('!')} ${title}  ${c.red('deleted on instance')}`, '');
         break;
-      case 'changed':
+      case 'changed': {
         lines.push(`${c.yellow('~')} ${c.bold(title)}`);
-        for (const change of comparison.changes) {
+        const possibleDefaults = comparison.changes.filter(isPossibleDefaultChange);
+        const realChanges = comparison.changes.filter((change) => !isPossibleDefaultChange(change));
+        for (const change of realChanges) {
           lines.push(...renderChange(change, c, options).map((line) => `    ${line}`));
+        }
+        if (possibleDefaults.length > 0) {
+          lines.push(`    ${c.dim('possible defaults:')}`);
+          for (const change of possibleDefaults) {
+            lines.push(...renderChange(change, c, options).map((line) => `      ${line}`));
+          }
         }
         lines.push('');
         break;
+      }
     }
   }
 
   lines.push(summary(comparisons, options));
+  if (comparisons.some((comparison) => comparison.changes.some(isPossibleDefaultChange))) {
+    lines.push(
+      c.dim(
+        'Possible defaults: parameters set on one side only. The n8n editor removes parameters equal to ' +
+          'their defaults when saving; run flowdiff pull to refresh your baseline.',
+      ),
+    );
+  }
   lines.push(...untrackedLines(comparisons, c, options));
   return lines.join('\n');
+}
+
+function isPossibleDefaultChange(change: Change): boolean {
+  return change.kind === 'parameter-changed' && change.possibleDefault;
 }
 
 /**
@@ -89,6 +110,12 @@ function summary(comparisons: WorkflowComparison[], options: TextRenderOptions):
     optional('only-before', `only in ${options.beforeLabel}`),
     optional('deleted-on-instance', 'deleted on instance'),
   ].filter(Boolean);
+  const possibleDefaults = comparisons.flatMap((comparison) =>
+    comparison.changes.filter(isPossibleDefaultChange),
+  ).length;
+  if (possibleDefaults > 0) {
+    parts.push(`${String(possibleDefaults)} possible default${possibleDefaults === 1 ? '' : 's'}`);
+  }
   return hasDifferences(comparisons) ? `${parts.join(', ')}.` : `No changes (${parts[1] ?? ''}).`;
 }
 

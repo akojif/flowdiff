@@ -200,6 +200,40 @@ describe('renderText', () => {
     });
   });
 
+  it('groups possible defaults after real changes and counts them (editor-save case)', () => {
+    // Local was pulled with explicit defaults; the editor stripped them on save,
+    // added binaryMode, and the user renamed one node.
+    const local = normalizedFixture('linear.json');
+    const fetch = nodeNamed(local, 'Fetch Items');
+    fetch.parameters = { ...fetch.parameters, specifyQuery: 'keypair' };
+    const instance = structuredClone(local);
+    instance.settings = { ...instance.settings, binaryMode: 'separate' };
+    const instanceFetch = nodeNamed(instance, 'Fetch Items');
+    instanceFetch.parameters = Object.fromEntries(
+      Object.entries(instanceFetch.parameters).filter(
+        ([key]) => key !== 'method' && key !== 'specifyQuery',
+      ),
+    );
+    nodeNamed(instance, 'Set Defaults').name = 'Set Defaultsss';
+    instance.connections = {
+      'Manual Trigger': { main: [[{ node: 'Set Defaultsss', type: 'main', index: 0 }]] },
+      'Set Defaultsss': { main: [[{ node: 'Fetch Items', type: 'main', index: 0 }]] },
+    };
+
+    expect(renderText(compareOne(instance, local), options)).toMatchInlineSnapshot(`
+      "instance → local
+
+      ~ Fixture: Linear (fixtureLinear001)
+          ~ node    "Set Defaultsss" renamed to "Set Defaults"
+          possible defaults:
+            + param   "Fetch Items" › method: "GET"
+            + param   "Fetch Items" › specifyQuery: "keypair"
+
+      1 changed, 0 unchanged, 2 possible defaults.
+      Possible defaults: parameters set on one side only. The n8n editor removes parameters equal to their defaults when saving; run flowdiff pull to refresh your baseline."
+    `);
+  });
+
   it('says so when nothing changed', () => {
     const linear = normalizedFixture('linear.json');
     expect(renderText(compareOne(linear, linear), options)).toMatchInlineSnapshot(`

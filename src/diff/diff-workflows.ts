@@ -2,7 +2,7 @@ import type { NormalizedWorkflow } from '../normalize/normalize.js';
 import { diffConnections } from './connections.js';
 import { diffNodeGroups } from './node-groups.js';
 import { settingsForComparison } from './settings.js';
-import type { Change, NodeRef } from './types.js';
+import type { Change, NodeRef, PathSegment, ValueChange } from './types.js';
 import { diffValues } from './values.js';
 
 export interface DiffOptions {
@@ -126,7 +126,13 @@ function diffNode(before: WorkflowNode, after: WorkflowNode, options: DiffOption
     }
   }
   for (const { path, change } of diffValues(before.parameters, after.parameters)) {
-    changes.push({ kind: 'parameter-changed', node, path, change });
+    changes.push({
+      kind: 'parameter-changed',
+      node,
+      path,
+      change,
+      possibleDefault: isPossibleDefault(path, change),
+    });
   }
   changes.push(...diffCredentials(before, after, node));
 
@@ -148,6 +154,23 @@ function diffNode(before: WorkflowNode, after: WorkflowNode, options: DiffOption
     }
   }
   return changes;
+}
+
+/**
+ * A parameter key that exists on one side only, with a simple value, may be a
+ * default the n8n editor stripped on save. Without node definitions flowdiff
+ * cannot know for sure, so this only labels the change.
+ *
+ * Added or removed array elements (e.g. a new form field) are never possible
+ * defaults, and neither are non-empty objects or arrays.
+ */
+export function isPossibleDefault(path: PathSegment[], change: ValueChange): boolean {
+  if (change.type !== 'added' && change.type !== 'removed') return false;
+  const last = path.at(-1);
+  if (last === undefined || !('key' in last)) return false;
+  const value = change.value;
+  if (value === null || typeof value !== 'object') return true;
+  return Array.isArray(value) ? value.length === 0 : Object.keys(value).length === 0;
 }
 
 /** Compares credential references by name. An id-only change is not a change. */

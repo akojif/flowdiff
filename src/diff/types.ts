@@ -71,7 +71,18 @@ export type Change =
       from: unknown;
       to: unknown;
     }
-  | { kind: 'parameter-changed'; node: NodeRef; path: PathSegment[]; change: ValueChange }
+  | {
+      kind: 'parameter-changed';
+      node: NodeRef;
+      path: PathSegment[];
+      change: ValueChange;
+      /**
+       * Present on one side and missing on the other. The n8n editor strips
+       * parameters equal to their defaults on save, so this may not change
+       * behaviour. Never hidden; renderers group these after real changes.
+       */
+      possibleDefault: boolean;
+    }
   /** Credential references are compared by name; ids differ between instances. */
   | {
       kind: 'credential-changed';

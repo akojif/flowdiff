@@ -515,3 +515,49 @@ describe('settings equivalent when missing', () => {
     });
   });
 });
+
+describe('possible defaults', () => {
+  const paramChanges = (before: NormalizedWorkflow, after: NormalizedWorkflow) =>
+    diffWorkflows(before, after).filter((c) => c.kind === 'parameter-changed');
+
+  const withFetchParams = (parameters: Record<string, unknown>) => {
+    const workflow = normalizedFixture('linear.json');
+    nodeNamed(workflow, 'Fetch Items').parameters = parameters;
+    return workflow;
+  };
+
+  it('labels a scalar parameter present on one side only as a possible default', () => {
+    const instance = withFetchParams({ url: 'https://api.example.com/items' });
+    const local = withFetchParams({ url: 'https://api.example.com/items', method: 'GET' });
+
+    expect(paramChanges(instance, local)).toMatchObject([
+      { path: [{ key: 'method' }], change: { type: 'added', value: 'GET' }, possibleDefault: true },
+    ]);
+    expect(paramChanges(local, instance)).toMatchObject([{ possibleDefault: true }]);
+  });
+
+  it('labels empty objects and arrays as possible defaults', () => {
+    const instance = withFetchParams({});
+    const local = withFetchParams({ options: {}, list: [] });
+    expect(paramChanges(instance, local).map((c) => c.possibleDefault)).toEqual([true, true]);
+  });
+
+  it('labels a missing key inside an id-matched array element as a possible default', () => {
+    const field = { id: 'f1', name: 'Link' };
+    const instance = withFetchParams({ fields: [field] });
+    const local = withFetchParams({ fields: [{ ...field, fieldType: 'text' }] });
+    expect(paramChanges(instance, local)).toMatchObject([{ possibleDefault: true }]);
+  });
+
+  it('does not label modified values, added array elements or non-empty objects', () => {
+    expect(
+      paramChanges(withFetchParams({ method: 'GET' }), withFetchParams({ method: 'POST' })),
+    ).toMatchObject([{ possibleDefault: false }]);
+    expect(
+      paramChanges(withFetchParams({ list: ['a'] }), withFetchParams({ list: ['a', 'b'] })),
+    ).toMatchObject([{ possibleDefault: false }]);
+    expect(
+      paramChanges(withFetchParams({}), withFetchParams({ options: { timeout: 5 } })),
+    ).toMatchObject([{ possibleDefault: false }]);
+  });
+});
