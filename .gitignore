@@ -10,8 +10,8 @@ coverage/
 !.env.example
 
 # Real workflows and local flowdiff state must never be committed
-workflows/
-.flowdiff/
+/workflows/
+/.flowdiff/
 
 # Logs and OS files
 *.log
