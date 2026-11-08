@@ -38,7 +38,11 @@ This is a public, open-source portfolio project. Code quality, tests, and the RE
   - `nodeGroups` are diffed in their own section (added/removed/renamed/description/membership).
   - Settings equivalent when missing (`src/diff/settings.ts`, currently only `binaryMode` = "separate") compare as equal. Add entries only after confirming n8n's runtime behaviour.
   - A parameter key present on one side only, with a scalar or empty value, is labelled `possibleDefault` (the n8n editor strips defaults on save). Never hidden: shown after real changes and counted separately.
+  - `classifyChange`: renames, notes, layout, tags, groups and possible defaults are cosmetic; everything else (including anything new) is behavior.
+  - `findBrokenReferences`: expressions/Code nodes referencing a node name that doesn't exist (`$('Name')`, `$node["Name"]`, `$node.Name`, `$items('Name')`; sticky notes ignored). Reported as warnings on the after side of changed or new workflows.
 - `src/render/` – turn `Change[]` into readable terminal text or JSON.
+  - Text: behavior changes first, then `cosmetic:` and `possible defaults:` groups. Display order: deleted, then changed (active, most behavior, most cosmetic first), then new. Summary view (one line per workflow) above 5 changed workflows; `--stat` / `--no-stat` force it on/off.
+  - JSON: name/id order, never truncated, each change has `impact`, each workflow has `counts` and `warnings`.
 - `src/config/` – load `.env`, read/validate `flowdiff.config.json`, resolve the instance URL (env over config) and API key (env only).
 - `src/workspace/` – workflow file naming (`<slug>.<id>.json`) and `.flowdiff/state.json` (content hash + instance `versionId` at last pull).
 - `src/commands/` – thin command handlers wiring the above together.
@@ -75,10 +79,12 @@ This is a public, open-source portfolio project. Code quality, tests, and the RE
    - push must not wipe pinData or staticData on the instance; verify how the update endpoint treats missing fields before shipping push.
    - push must not recreate workflows that are "deleted on instance" (pulled before, now gone) without explicit confirmation.
    - status and push use the same tag scope as diff (`resolveTagScope`).
+   - push must refuse, or ask for explicit confirmation, when the workflows being pushed have broken-reference warnings.
 4. Polish: GitHub Action posting diffs as PR comments, hard-coded-secret scanner, README with `vhs` demo, npm publish
    - The GitHub Action must redact values the secret scanner flags before posting diffs as PR comments.
 
 ## Backlog
 
+- Phase 4: `--exit-code=behavior`, so CI only fails on behavior changes (not cosmetic-only diffs).
 - Clearer diff header than "instance → local", e.g. "Changes push would make to the instance" (and a matching phrasing for git ranges).
 - Opt-in node defaults cache: `flowdiff defaults fetch --n8n-version <v>` downloads `n8n-nodes-base@<v>`'s `dist/types/nodes.json` from npm into `.flowdiff/cache/` (gitignored, never bundled: that data is under n8n's Sustainable Use License, and flowdiff stays MIT). A parameter missing on one side and equal to its declared default for that node type/version on the other would then not count as a change. Unknown type/version: show the change. Note: npm's `latest` tag for n8n-nodes-base is stale; use the version matching the instance (e.g. the `stable` tag).
