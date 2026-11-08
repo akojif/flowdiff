@@ -144,3 +144,24 @@ describe('unknownTopLevelFields', () => {
     expect(unknownTopLevelFields(workflow)).toEqual(['alpha', 'zeta']);
   });
 });
+
+describe('fields seen on a real instance', () => {
+  const nodeGroups = [{ id: 'g1', name: 'Fetch', description: 'Fake group', nodeIds: { a: true } }];
+  const workflow = {
+    ...loadFixture('linear.json'),
+    activeVersion: { versionId: 'fake-version', createdAt: '2026-01-01T00:00:00.000Z' },
+    nodeGroups,
+  };
+
+  it('strips activeVersion', () => {
+    expect(normalizeWorkflow(workflow)).not.toHaveProperty('activeVersion');
+  });
+
+  it('keeps nodeGroups', () => {
+    expect(normalizeWorkflow(workflow).nodeGroups).toEqual(nodeGroups);
+  });
+
+  it('treats both as known fields', () => {
+    expect(unknownTopLevelFields(workflow)).toEqual([]);
+  });
+});

@@ -10,6 +10,8 @@ export const STRIPPED_FIELDS = [
   'updatedAt',
   'versionId',
   'activeVersionId',
+  // Details of the published version; changes on publish, like activeVersionId.
+  'activeVersion',
   'versionCounter',
   'triggerCount',
   'shared',
@@ -30,6 +32,8 @@ export const KEPT_FIELDS = [
   'connections',
   'settings',
   'tags',
+  // Canvas groups the author creates: user content, so it belongs in git.
+  'nodeGroups',
 ] as const;
 
 const KNOWN_FIELDS = new Set<string>([...KEPT_FIELDS, ...STRIPPED_FIELDS]);
