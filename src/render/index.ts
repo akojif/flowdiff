@@ -1,2 +1,2 @@
-// Turns Change[] into readable terminal text or JSON.
-export {};
+export * from './json.js';
+export * from './text.js';
