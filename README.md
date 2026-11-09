@@ -139,7 +139,7 @@ Why each of these exists, and the n8n API behaviour behind them: [docs/how-it-wo
 
 ## How I built this
 
-_Coming soon._
+I wrote about why I built flowdiff and how it came together: [flowdiff: a safety net for your n8n workflows](https://medium.com/@akfdev/flowdiff-a-safety-net-for-your-n8n-workflows-44065b913a66) (Medium).
 
 ## Development
 
