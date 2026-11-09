@@ -38,6 +38,8 @@ export interface TextRenderOptions {
   title?: string;
   /** Indent for lines of a line-level text diff. Default: aligned under the change. */
   hunkIndent?: string;
+  /** Leave out the explanatory hints under the summary line. */
+  quiet?: boolean;
 }
 
 type Colors = ReturnType<typeof createColors>;
@@ -64,7 +66,8 @@ export function renderText(comparisons: WorkflowComparison[], options: TextRende
     lines.push(c.bold(title), '', ...detailView(ordered, c, options));
   }
 
-  lines.push(summaryLine(comparisons, options), ...hints(comparisons, c));
+  lines.push(summaryLine(comparisons, options));
+  if (options.quiet !== true) lines.push(...hints(comparisons, c, options.width));
   lines.push(
     ...untrackedLines(
       comparisons.filter((comparison) => comparison.status === 'untracked'),
@@ -374,36 +377,47 @@ export function hintsFor(comparisons: WorkflowComparison[], canShowSecrets: bool
   if (comparisons.some((comparison) => comparison.changes.some(isPossibleDefaultChange))) {
     hints.push({
       tone: 'info',
-      text:
-        'Possible defaults: parameters set on one side only. The n8n editor removes parameters equal to ' +
-        'their defaults when saving; run flowdiff pull to refresh your baseline.',
+      text: 'Possible defaults: likely removed by the n8n editor on save; flowdiff pull refreshes your baseline.',
     });
   }
   if (comparisons.some((comparison) => comparison.warnings.length > 0)) {
     hints.push({
       tone: 'warning',
-      text:
-        'Broken references: expressions or Code nodes refer to node names that do not exist, often after a ' +
-        'rename. These nodes will fail when they run.',
+      text: "Broken references: these expressions name nodes that don't exist, so those nodes will fail.",
     });
   }
   if (comparisons.some((comparison) => comparison.secrets.length > 0)) {
     hints.push({
       tone: 'warning',
-      text:
-        'Possible secrets: values that look like hard-coded credentials; use n8n credentials instead. ' +
-        'If a real secret was committed, rotate it: redacting the output does not remove it from git history. ' +
-        `Values are redacted here${canShowSecrets ? ' (--show-secrets shows them)' : ''}. ` +
-        'The check is heuristic and can miss secrets.',
+      text: `Possible secrets are redacted${canShowSecrets ? ' (--show-secrets shows them)' : ''}; use n8n credentials and rotate any real key.`,
     });
   }
   return hints;
 }
 
-function hints(comparisons: WorkflowComparison[], c: Colors): string[] {
-  return hintsFor(comparisons, true).map((hint) =>
-    hint.tone === 'warning' ? c.yellow(hint.text) : c.dim(hint.text),
+function hints(comparisons: WorkflowComparison[], c: Colors, width: number | undefined): string[] {
+  return hintsFor(comparisons, true).flatMap((hint) =>
+    wrapWords(hint.text, width).map((line) =>
+      hint.tone === 'warning' ? c.yellow(line) : c.dim(line),
+    ),
   );
+}
+
+/** Splits text into lines of at most `width` characters at word boundaries. No width: one line. */
+export function wrapWords(text: string, width: number | undefined): string[] {
+  if (width === undefined || text.length <= width) return [text];
+  const lines: string[] = [];
+  let line = '';
+  for (const word of text.split(' ')) {
+    if (line !== '' && line.length + 1 + word.length > width) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = line === '' ? word : `${line} ${word}`;
+    }
+  }
+  if (line !== '') lines.push(line);
+  return lines;
 }
 
 /** Plain (uncoloured) lines for one change. */

@@ -34,6 +34,8 @@ export interface DiffFlags {
   stat?: boolean;
   /** Show values that look like secrets instead of redacting them. */
   showSecrets?: boolean;
+  /** Leave out the explanatory hints. */
+  quiet?: boolean;
   json?: boolean;
   includeLayout?: boolean;
   full?: boolean;
@@ -140,6 +142,7 @@ export async function diffCommand(options: DiffCommandOptions): Promise<DiffComm
         title,
         full: flags.full === true,
         canShowSecrets: true,
+        quiet: flags.quiet === true,
       }).markdown;
       break;
     case 'text':
@@ -148,6 +151,7 @@ export async function diffCommand(options: DiffCommandOptions): Promise<DiffComm
         color: options.color,
         full: flags.full === true,
         showAll: flags.all === true,
+        quiet: flags.quiet === true,
         view,
         title,
         ...(options.width === undefined ? {} : { width: options.width }),

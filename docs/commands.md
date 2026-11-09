@@ -49,6 +49,7 @@ flowdiff diff main..feature        # workflow files between two git refs (no ins
 | `--stat` / `--no-stat`            | Force the one-line-per-workflow summary on or off. It's the default above 5 changed workflows. |
 | `--full`                          | Show long values in full instead of truncating them (JSON is never truncated).                 |
 | `--include-layout`                | Also show node position changes.                                                               |
+| `--quiet`                         | Leave out the explanatory hints under the summary line.                                        |
 | `--show-secrets`                  | Show values that look like secrets instead of redacting them.                                  |
 | `--exit-code [mode]`              | Exit with 1 on any change (`changes`, the default) or only on behavior changes (`behavior`).   |
 | `--all`                           | List untracked instance workflows individually.                                                |

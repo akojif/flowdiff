@@ -218,7 +218,7 @@ describe('detail view', () => {
             ~ node    "Fetch Records" renamed to "Load Records"
 
       1 changed (0 with behavior changes), 0 unchanged, 1 broken reference.
-      Broken references: expressions or Code nodes refer to node names that do not exist, often after a rename. These nodes will fail when they run."
+      Broken references: these expressions name nodes that don't exist, so those nodes will fail."
     `);
   });
 });

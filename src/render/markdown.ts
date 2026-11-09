@@ -32,6 +32,8 @@ export interface MarkdownRenderOptions {
   fullReportUrl?: string;
   /** Whether --show-secrets exists where this is shown (false in the GitHub Action). */
   canShowSecrets?: boolean;
+  /** Leave out the explanatory hints. */
+  quiet?: boolean;
 }
 
 export interface MarkdownReport {
@@ -63,7 +65,9 @@ export function renderMarkdown(
   }
 
   const foot: string[] = [];
-  for (const hint of hintsFor(comparisons, options.canShowSecrets ?? false)) {
+  const hints =
+    options.quiet === true ? [] : hintsFor(comparisons, options.canShowSecrets ?? false);
+  for (const hint of hints) {
     foot.push(`> ${hint.tone === 'warning' ? '⚠️ ' : ''}${escapeInline(hint.text)}`, '');
   }
 

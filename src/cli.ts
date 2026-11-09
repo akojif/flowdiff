@@ -58,6 +58,7 @@ program
   .option('--json', 'shorthand for --format json (never truncated)')
   .option('--show-secrets', 'show values that look like secrets instead of redacting them')
   .option('--include-layout', 'also show node position changes')
+  .option('--quiet', 'leave out the explanatory hints under the summary')
   .option('--full', 'show long values in full instead of truncating them')
   .option(
     '--exit-code [mode]',

@@ -121,7 +121,7 @@ describe('renderMarkdown', () => {
     expect(markdown).not.toContain(FAKE.bearer);
     expect(markdown).toContain('‹redacted bearer token #');
     expect(markdown).toContain('looks like a hard-coded secret');
-    expect(markdown).toContain('rotate it');
+    expect(markdown).toContain('rotate any real key');
     expect(markdown).not.toContain('--show-secrets');
   });
 

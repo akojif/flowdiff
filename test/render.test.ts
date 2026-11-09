@@ -5,6 +5,7 @@ import {
   formatValue,
   renderJson,
   renderText,
+  wrapWords,
   type TextRenderOptions,
 } from '../src/render/index.js';
 import { at, nodeNamed, normalizedFixture } from './helpers.js';
@@ -260,7 +261,7 @@ describe('renderText', () => {
             + param   "Fetch Items" › specifyQuery: "keypair"
 
       1 changed (0 with behavior changes), 0 unchanged, 2 possible defaults.
-      Possible defaults: parameters set on one side only. The n8n editor removes parameters equal to their defaults when saving; run flowdiff pull to refresh your baseline."
+      Possible defaults: likely removed by the n8n editor on save; flowdiff pull refreshes your baseline."
     `);
   });
 
@@ -348,5 +349,46 @@ describe('renderJson', () => {
     const json = renderJson(compareOne(before, after), options);
     expect(json).toContain('"id": null');
     expect(json).toContain('"outputLabel": null');
+  });
+});
+
+describe('hints', () => {
+  const withBrokenReference = () => {
+    const before = normalizedFixture('linear.json');
+    const after = structuredClone(before);
+    nodeNamed(after, 'Fetch Items').parameters = { url: "={{ $('Gone').item.json.url }}" };
+    return compareOne(before, after);
+  };
+
+  it('keeps each hint to one line when the terminal is wide enough', () => {
+    const text = renderText(withBrokenReference(), { ...options, width: 120 });
+    expect(text.split('\n').at(-1)).toBe(
+      "Broken references: these expressions name nodes that don't exist, so those nodes will fail.",
+    );
+  });
+
+  it('wraps hints at word boundaries in narrow terminals', () => {
+    const lines = renderText(withBrokenReference(), { ...options, width: 40 })
+      .split('\n')
+      .slice(-3);
+    expect(lines).toEqual([
+      'Broken references: these expressions',
+      "name nodes that don't exist, so those",
+      'nodes will fail.',
+    ]);
+  });
+
+  it('leaves hints out with quiet', () => {
+    const text = renderText(withBrokenReference(), { ...options, quiet: true });
+    expect(text).not.toContain('Broken references:');
+    expect(text).toContain('1 broken reference.');
+  });
+});
+
+describe('wrapWords', () => {
+  it('splits at spaces, never inside a word', () => {
+    expect(wrapWords('aa bb cc dd', 5)).toEqual(['aa bb', 'cc dd']);
+    expect(wrapWords('averyveryverylongword x', 5)).toEqual(['averyveryverylongword', 'x']);
+    expect(wrapWords('short', undefined)).toEqual(['short']);
   });
 });
