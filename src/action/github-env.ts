@@ -10,9 +10,14 @@ import { FlowdiffError } from '../errors.js';
 
 export type Env = Readonly<Record<string, string | undefined>>;
 
-/** Reads an action input. GitHub exposes `fail-on` as `INPUT_FAIL-ON`. */
+/**
+ * Reads an action input. JavaScript actions get `fail-on` as `INPUT_FAIL-ON`;
+ * composite actions map inputs themselves and use `INPUT_FAIL_ON`, since names
+ * with hyphens aren't valid shell variables. Both forms are accepted.
+ */
 export function getInput(env: Env, name: string): string {
-  return (env[`INPUT_${name.replace(/ /g, '_').toUpperCase()}`] ?? '').trim();
+  const key = `INPUT_${name.replace(/ /g, '_').toUpperCase()}`;
+  return (env[key] ?? env[key.replace(/-/g, '_')] ?? '').trim();
 }
 
 /**

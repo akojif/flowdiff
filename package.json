@@ -46,7 +46,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "changeset": "changeset",
-    "prepublishOnly": "npm run lint && npm run typecheck && npm test && npm run build"
+    "prepublishOnly": "npm run lint && npm run typecheck && npm test && npm run build",
+    "version-packages": "changeset version && node scripts/sync-action-version.mjs && npm install --package-lock-only"
   },
   "dependencies": {
     "@clack/prompts": "^1.8.1",

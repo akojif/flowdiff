@@ -1,0 +1,57 @@
+name: flowdiff
+description: Readable diffs of n8n workflow changes on pull requests, with an optional behavior-change gate.
+author: Francis Akoji
+branding:
+  icon: git-pull-request
+  color: orange
+
+inputs:
+  fail-on:
+    description: 'Fail the check on: none, changes (any difference) or behavior (behavior changes, broken references, added/removed workflows).'
+    required: false
+    default: none
+  comment:
+    description: Post or update one pull request comment with the report.
+    required: false
+    default: 'true'
+  working-directory:
+    description: Folder containing flowdiff.config.json.
+    required: false
+    default: .
+  token:
+    description: Token used only to list, create and update the pull request comment.
+    required: false
+    default: ${{ github.token }}
+# There is deliberately no input to show secrets: the Action always redacts them.
+
+outputs:
+  changed:
+    description: Number of workflows that changed, were added or were removed.
+    value: ${{ steps.flowdiff.outputs.changed }}
+  behavior:
+    description: '"true" if any change would fail fail-on: behavior.'
+    value: ${{ steps.flowdiff.outputs.behavior }}
+  report-path:
+    description: Path to the full Markdown report.
+    value: ${{ steps.flowdiff.outputs.report-path }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v5
+      with:
+        node-version: '24'
+        package-manager-cache: false
+
+    # The exact version is kept in sync with package.json by scripts/sync-action-version.mjs.
+    - id: flowdiff
+      shell: bash
+      run: npx --yes @akojif/flowdiff@0.1.1 github-action
+      # Same input names a JavaScript action would get (what flowdiff 0.1.1+ reads).
+      env:
+        INPUT_FAIL-ON: ${{ inputs.fail-on }}
+        INPUT_COMMENT: ${{ inputs.comment }}
+        INPUT_WORKING-DIRECTORY: ${{ inputs.working-directory }}
+        INPUT_TOKEN: ${{ inputs.token }}
+        # Don't run any dependency install scripts while fetching the package.
+        npm_config_ignore_scripts: 'true'

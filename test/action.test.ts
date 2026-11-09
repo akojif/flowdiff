@@ -40,6 +40,9 @@ describe('GitHub Actions environment helpers', () => {
   it('reads inputs the way GitHub exposes them', () => {
     expect(getInput({ 'INPUT_FAIL-ON': ' behavior ' }, 'fail-on')).toBe('behavior');
     expect(getInput({}, 'comment')).toBe('');
+    // Composite actions map inputs themselves, with underscores.
+    expect(getInput({ INPUT_FAIL_ON: 'changes' }, 'fail-on')).toBe('changes');
+    expect(getInput({ INPUT_WORKING_DIRECTORY: 'n8n' }, 'working-directory')).toBe('n8n');
   });
 
   it('writes multi-line output values intact', () => {
