@@ -112,6 +112,7 @@ Verified against n8n 2.46 source and live (2026-11-09):
 
 ## Backlog
 
+- npm audit (2026-11-09): 9 moderate findings, all dev-only (`npm audit --omit=dev` is clean), from one minimatch advisory (GHSA-g3hv-75wg-m249) via eslint and typescript-eslint. Fixed only in minimatch 11.0.1+, which even the latest eslint/typescript-eslint don't accept (`^10`); `npm audit fix --force` would downgrade eslint. Revisit when they move to minimatch 11.
 - Description syncing: the list endpoint doesn't return `description`, so it is never pulled or pushed (n8n keeps it untouched). Syncing it would mean fetching each workflow with the single GET (one request per workflow) and hashing that shape everywhere.
 - Future CI push mode: needs a non-interactive path (no `--yes` today) with extra safeguards, e.g. an explicit allow-list of workflow ids, `--exit-code` on refusals, and a separate write key.
 - Action `fail-on: secrets` (secrets currently only warn and suggest key rotation).
