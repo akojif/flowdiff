@@ -1,7 +1,8 @@
 # Publishes to npm when a version tag (v1.2.3) is pushed, using npm trusted
 # publishing (OIDC): no npm token is stored anywhere. Provenance attestations are
 # generated automatically. The `npm` environment requires approval before the
-# job runs, and only accepts v* tags.
+# job runs, and only accepts v* tags. After a successful publish, the major
+# version tag (v0) that GitHub Action users reference is moved to the release.
 #
 # This file name (release.yml) and the environment name (npm) must match the
 # trusted publisher configured on npmjs.com.
@@ -9,7 +10,8 @@ name: Release
 
 on:
   push:
-    tags: ['v*']
+    # Full versions only, so moving the v0 tag can never start a release.
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
 
 permissions:
   contents: read
@@ -48,6 +50,9 @@ jobs:
             exit 1
           fi
 
+      - name: Check action.yml runs this exact version
+        run: node scripts/sync-action-version.mjs --check
+
       - name: Skip if this version is already on npm
         id: published
         run: |
@@ -63,3 +68,20 @@ jobs:
       # prepublishOnly runs lint, typecheck, tests and the build first.
       - run: npm publish
         if: steps.published.outputs.skip != 'true'
+
+  update-major-tag:
+    name: Move the v0 tag
+    # Runs only after the approved publish job has succeeded.
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to move the tag; tags pushed with this token start no workflows
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Point the major version tag at this release
+        run: |
+          major="${GITHUB_REF_NAME%%.*}" # v0.1.2 -> v0
+          git tag --force "$major" "$GITHUB_SHA"
+          git push --force origin "refs/tags/$major"
+          echo "::notice::$major now points at $GITHUB_REF_NAME ($GITHUB_SHA)"
