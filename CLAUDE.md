@@ -53,6 +53,15 @@ This is a public, open-source portfolio project. Code quality, tests, and the RE
 - Activate/deactivate are separate endpoints, not part of the update.
 - Credential IDs differ between instances; the API never returns credential secrets. Reference credentials by name and warn if missing.
 
+Verified against n8n 2.46 source and live (2026-11-09):
+
+- `PUT /workflows/{id}` body is STRICT at every level (unknown top-level fields, node fields or settings keys → 400). Writable: `name`, `nodes`, `connections`, `settings` (required), optional `nodeGroups` (`nodeIds` is an array), `description`, `staticData`, `pinData`. Read-only: `id`, `active`, `tags`, `meta`, `versionId`, timestamps, `shared`. push builds the body field by field from allow-lists in `src/push/request-body.ts` and drops anything else with a warning.
+- Omitted `pinData` / `staticData` are NOT touched (only sent fields are written). Verified live: markers in both survived an update without them, and `versionId` only changes when nodes/connections/nodeGroups change. push never sends them. Content-hash change detection relies on this.
+- Updating an active (published) workflow re-publishes it automatically unless `?publishIfActive=false`. push always sends `publishIfActive=false`; publishing/activation only happens via `--apply-active` (separate activate/deactivate endpoints).
+- Settings are merged with the stored settings, then n8n strips values equal to its defaults. `binaryMode` is accepted but dropped.
+- On update n8n resolves credentials whose id doesn't exist by name + type within the project (if exactly one matches). Listing credentials (`GET /credentials`) needs the `credential:list` API key scope; without it push skips the missing-credential check and says so.
+- Tags are set via a separate endpoint (`PUT /workflows/{id}/tags`, tag ids); push does not push tag changes.
+
 ## Safety rules (important)
 
 - Development runs against the author's LIVE n8n instance.
@@ -85,6 +94,7 @@ This is a public, open-source portfolio project. Code quality, tests, and the RE
 
 ## Backlog
 
+- Future CI push mode: needs a non-interactive path (no `--yes` today) with extra safeguards, e.g. an explicit allow-list of workflow ids, `--exit-code` on refusals, and a separate write key.
 - Phase 4: `--exit-code=behavior`, so CI only fails on behavior changes (not cosmetic-only diffs). Workflows with broken-reference warnings count as behavior even when the rename itself is cosmetic; use `hasBehaviorImpact` from `src/diff/classify.ts`.
 - Clearer diff header than "instance → local", e.g. "Changes push would make to the instance" (and a matching phrasing for git ranges).
 - Opt-in node defaults cache: `flowdiff defaults fetch --n8n-version <v>` downloads `n8n-nodes-base@<v>`'s `dist/types/nodes.json` from npm into `.flowdiff/cache/` (gitignored, never bundled: that data is under n8n's Sustainable Use License, and flowdiff stays MIT). A parameter missing on one side and equal to its declared default for that node type/version on the other would then not count as a change. Unknown type/version: show the change. Note: npm's `latest` tag for n8n-nodes-base is stale; use the version matching the instance (e.g. the `stable` tag).
