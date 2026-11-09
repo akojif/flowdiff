@@ -72,3 +72,21 @@ export async function readWorkflowsAtRef(
   }
   return result;
 }
+
+/**
+ * The commit where `head` branched off `base`: diffing from here matches what
+ * GitHub shows for a pull request, so changes that landed on the base branch
+ * later don't appear reversed. Undefined when there is no common history
+ * available (e.g. a shallow clone).
+ */
+export async function mergeBase(
+  cwd: string,
+  base: string,
+  head: string,
+): Promise<string | undefined> {
+  try {
+    return (await git(cwd, ['merge-base', '--end-of-options', base, head])).trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}

@@ -44,12 +44,13 @@ This is a public, open-source portfolio project. Code quality, tests, and the RE
   - `classifyChange`: renames, notes, layout, tags, groups and possible defaults are cosmetic; everything else (including anything new) is behavior.
   - `findBrokenReferences`: expressions/Code nodes referencing a node name that doesn't exist (`$('Name')`, `$node["Name"]`, `$node.Name`, `$items('Name')`; sticky notes ignored). Reported as warnings on the after side of changed or new workflows.
 - `src/secrets/` – heuristic secret scanner (known token formats, private keys, bearer/basic auth, URL credentials, secrets assigned in code, literal values at sensitive names incl. n8n name/value header lists). `compareWorkflowSets` redacts BOTH workflows before diffing (fingerprinted markers like `‹redacted bearer token #3f9a›`), so every renderer gets redacted data; `--show-secrets` (diff, push) turns it off. The push request body is always built from the real local file, never the redacted copy. Warnings in diff, status, pull ("check before committing") and push; push asks (default No) only when it adds or changes a secret. Test tokens are assembled at run time.
-- `src/render/` – turn `Change[]` into readable terminal text or JSON.
+- `src/render/` – turn `Change[]` into readable terminal text, JSON or Markdown (`renderMarkdown`, shared by `diff --format markdown` and the Action; escapes HTML/table syntax/@mentions and uses fences longer than any backtick run).
   - Text: behavior changes first, then `cosmetic:` and `possible defaults:` groups. Display order: deleted, then workflows with broken-reference warnings, then changed (active, most behavior, most cosmetic first), then new. Summary view (one line per workflow) above 5 changed workflows; `--stat` / `--no-stat` force it on/off.
   - JSON: name/id order, never truncated, each change has `impact`, each workflow has `counts` and `warnings`.
 - `src/config/` – load `.env`, read/validate `flowdiff.config.json`, resolve the instance URL (env over config) and API key (env only).
 - `src/workspace/` – workflow file naming (`<slug>.<id>.json`) and `.flowdiff/state.json` (content hash + instance `versionId` at last pull).
 - `src/commands/` – thin command handlers wiring the above together.
+- `src/action/` – GitHub Action logic, run via the hidden `flowdiff github-action` command (inputs from env). `pull_request` only (refuses `pull_request_target`), diffs merge-base..head with `compareGitRefs` (always redacted; no show-secrets path), one sticky comment (`<!-- flowdiff-report -->`, posted by a Bot) within `COMMENT_MAX_LENGTH`, full report in the job summary and `report-path`, falls back to the job summary on 403/404 (fork PRs), `fail-on: none|changes|behavior` via `shouldFail`. No @actions/* dependencies: small helpers with delimiter-safe GITHUB_OUTPUT writing.
 
 ## n8n API gotchas
 
@@ -96,6 +97,8 @@ Verified against n8n 2.46 source and live (2026-11-09):
    - status and push use the same tag scope as diff (`resolveTagScope`).
    - push must refuse, or ask for explicit confirmation, when the workflows being pushed have broken-reference warnings.
 4. Polish: GitHub Action posting diffs as PR comments, hard-coded-secret scanner, README with `vhs` demo, npm publish
+   - Order: Markdown renderer + Action logic (done) → README → npm release (changesets, trusted publishing; ask first) → composite `action.yml` pinned to an exact npm version, with `actions/setup-node` pinning Node → demo repo `akojif/flowdiff-demo` (ask first). README example workflow uses minimal permissions and a `concurrency` group.
+   - `--exit-code [changes|behavior]` is done (`shouldFail`): behavior = behavior changes, broken references, or added/removed workflows.
    - The GitHub Action must redact values the secret scanner flags before posting diffs as PR comments. It must NEVER allow `--show-secrets` (no input, no passthrough).
 
 ## Backlog
@@ -103,5 +106,6 @@ Verified against n8n 2.46 source and live (2026-11-09):
 - README: state that the secret scanner is heuristic and doesn't catch every secret (a clean result means "no known pattern found").
 - Description syncing: the list endpoint doesn't return `description`, so it is never pulled or pushed (n8n keeps it untouched). Syncing it would mean fetching each workflow with the single GET (one request per workflow) and hashing that shape everywhere.
 - Future CI push mode: needs a non-interactive path (no `--yes` today) with extra safeguards, e.g. an explicit allow-list of workflow ids, `--exit-code` on refusals, and a separate write key.
-- Phase 4: `--exit-code=behavior`, so CI only fails on behavior changes (not cosmetic-only diffs). Workflows with broken-reference warnings count as behavior even when the rename itself is cosmetic; use `hasBehaviorImpact` from `src/diff/classify.ts`.
+- Action `fail-on: secrets` (secrets currently only warn and suggest key rotation).
+- Comments on fork PRs via the safe two-workflow `workflow_run` pattern (never `pull_request_target`).
 - Opt-in node defaults cache: `flowdiff defaults fetch --n8n-version <v>` downloads `n8n-nodes-base@<v>`'s `dist/types/nodes.json` from npm into `.flowdiff/cache/` (gitignored, never bundled: that data is under n8n's Sustainable Use License, and flowdiff stays MIT). A parameter missing on one side and equal to its declared default for that node type/version on the other would then not count as a change. Unknown type/version: show the change. Note: npm's `latest` tag for n8n-nodes-base is stale; use the version matching the instance (e.g. the `stable` tag).

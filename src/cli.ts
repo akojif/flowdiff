@@ -2,6 +2,7 @@ import { Command, CommanderError } from 'commander';
 import pc from 'picocolors';
 import packageJson from '../package.json' with { type: 'json' };
 import { runDiff, type DiffFlags } from './commands/diff.js';
+import { runAction } from './action/run.js';
 import { runInit } from './commands/init.js';
 import { runPull } from './commands/pull.js';
 import { runPush, type PushFlags } from './commands/push.js';
@@ -87,6 +88,19 @@ program
   .option('--no-tag', 'ignore the tag saved in flowdiff.config.json for this run')
   .action(async (workflow: string | undefined, flags: PushFlags) => {
     await runPush(process.cwd(), workflow, flags);
+  });
+
+// Used by the GitHub Action (action.yml); reads its inputs from the environment.
+program
+  .command('github-action', { hidden: true })
+  .description('run as the flowdiff GitHub Action')
+  .action(async () => {
+    process.exitCode = await runAction({
+      env: process.env,
+      log: (line) => {
+        console.log(line);
+      },
+    });
   });
 
 // Exit codes: 0 = success / no changes, 1 = changes or conflicts found, 2 = error.

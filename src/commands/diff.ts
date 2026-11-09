@@ -159,6 +159,20 @@ export async function diffCommand(options: DiffCommandOptions): Promise<DiffComm
   return { output, differs: hasDifferences(comparisons), comparisons };
 }
 
+/**
+ * Compares workflow files between two git refs (no network). Secrets are always
+ * redacted: callers that must never show them (the GitHub Action) use this.
+ */
+export async function compareGitRefs(
+  cwd: string,
+  config: Config,
+  from: string,
+  to: string,
+): Promise<WorkflowComparison[]> {
+  const sides = await gitSides(cwd, config, from, to);
+  return compareWorkflowSets(sides.before, sides.after, { activeSide: 'after' });
+}
+
 async function gitSides(cwd: string, config: Config, from: string, to: string): Promise<Sides> {
   const before = await readWorkflowsAtRef(cwd, from, config.workflowsDir);
   const after = await readWorkflowsAtRef(cwd, to, config.workflowsDir);
