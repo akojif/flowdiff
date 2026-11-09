@@ -64,6 +64,7 @@ Verified against n8n 2.46 source and live (2026-11-09):
 - Settings are merged with the stored settings, then n8n strips values equal to its defaults. `binaryMode` is accepted but dropped.
 - On update n8n resolves credentials whose id doesn't exist by name + type within the project (if exactly one matches). Listing credentials (`GET /credentials`) needs the `credential:list` API key scope; without it push skips the missing-credential check and says so.
 - Tags are set via a separate endpoint (`PUT /workflows/{id}/tags`, tag ids); push does not push tag changes.
+- The list endpoint and the single GET return different fields: `GET /workflows/{id}` adds `description`, `sourceWorkflowId`, `versionCounter` (and pin data on request). Every hash flowdiff compares (pull, status, push's pre-write check and post-push refresh) must come from the list endpoint; push uses the list filtered by the dev-guard tag (`listedVersion`). The single GET is only for backups. The test fake client mimics this difference.
 
 ## Safety rules (important)
 
@@ -97,6 +98,7 @@ Verified against n8n 2.46 source and live (2026-11-09):
 
 ## Backlog
 
+- Description syncing: the list endpoint doesn't return `description`, so it is never pulled or pushed (n8n keeps it untouched). Syncing it would mean fetching each workflow with the single GET (one request per workflow) and hashing that shape everywhere.
 - Future CI push mode: needs a non-interactive path (no `--yes` today) with extra safeguards, e.g. an explicit allow-list of workflow ids, `--exit-code` on refusals, and a separate write key.
 - Phase 4: `--exit-code=behavior`, so CI only fails on behavior changes (not cosmetic-only diffs). Workflows with broken-reference warnings count as behavior even when the rename itself is cosmetic; use `hasBehaviorImpact` from `src/diff/classify.ts`.
 - Opt-in node defaults cache: `flowdiff defaults fetch --n8n-version <v>` downloads `n8n-nodes-base@<v>`'s `dist/types/nodes.json` from npm into `.flowdiff/cache/` (gitignored, never bundled: that data is under n8n's Sustainable Use License, and flowdiff stays MIT). A parameter missing on one side and equal to its declared default for that node type/version on the other would then not count as a change. Unknown type/version: show the change. Note: npm's `latest` tag for n8n-nodes-base is stale; use the version matching the instance (e.g. the `stable` tag).
