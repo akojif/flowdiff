@@ -1,4 +1,4 @@
-import type { z } from 'zod';
+import { z } from 'zod';
 import type { Connection } from '../config/connection.js';
 import {
   ApiError,
@@ -8,7 +8,13 @@ import {
   UnexpectedResponseError,
   UnreachableError,
 } from './errors.js';
-import { workflowListSchema, workflowSchema, type ApiWorkflow } from './schemas.js';
+import {
+  credentialListSchema,
+  workflowListSchema,
+  workflowSchema,
+  type ApiCredential,
+  type ApiWorkflow,
+} from './schemas.js';
 
 const API_PATH = '/api/v1';
 const PAGE_SIZE = 100;
@@ -26,9 +32,41 @@ export interface ListWorkflowsOptions {
   tag?: string;
 }
 
+export interface GetWorkflowOptions {
+  /** Include pin data (used for backups). Default: false. */
+  includePinData?: boolean;
+}
+
+/** The fields push sends. Built by `buildUpdateBody`; n8n rejects anything else. */
+export type WorkflowUpdateBody = Record<string, unknown> & {
+  name: string;
+  nodes: unknown[];
+  connections: Record<string, unknown>;
+  settings: Record<string, unknown>;
+};
+
 export interface N8nClient {
   listWorkflows(options?: ListWorkflowsOptions): Promise<ApiWorkflow[]>;
-  getWorkflow(id: string): Promise<ApiWorkflow>;
+  getWorkflow(id: string, options?: GetWorkflowOptions): Promise<ApiWorkflow>;
+  /**
+   * Updates a workflow. Always sends `publishIfActive=false`, so an active
+   * workflow's live version is never replaced by an update.
+   */
+  updateWorkflow(id: string, body: WorkflowUpdateBody): Promise<void>;
+  activateWorkflow(id: string): Promise<void>;
+  deactivateWorkflow(id: string): Promise<void>;
+  /** Needs the `credential:list` API key scope. */
+  listCredentials(): Promise<ApiCredential[]>;
+}
+
+interface RequestOptions<T> {
+  operation: string;
+  schema: z.ZodType<T>;
+  method?: 'GET' | 'PUT' | 'POST';
+  query?: Record<string, string | undefined>;
+  body?: unknown;
+  /** API key scope to mention when n8n answers 403. */
+  scope?: string;
 }
 
 /**
@@ -46,12 +84,8 @@ export function createClient(options: ClientOptions): N8nClient {
   const baseUrl = apiBaseUrl(connection.instanceUrl);
   const where = `${connection.instanceUrl} (from ${connection.urlSource})`;
 
-  async function request<T>(
-    path: string,
-    operation: string,
-    schema: z.ZodType<T>,
-    query: Record<string, string | undefined> = {},
-  ): Promise<T> {
+  async function request<T>(path: string, options: RequestOptions<T>): Promise<T> {
+    const { operation, schema, method = 'GET', query = {}, body, scope } = options;
     const url = new URL(`${baseUrl}${path}`);
     for (const [key, value] of Object.entries(query)) {
       if (value !== undefined) url.searchParams.set(key, value);
@@ -60,7 +94,13 @@ export function createClient(options: ClientOptions): N8nClient {
     let response: Response;
     try {
       response = await fetchFn(url, {
-        headers: { 'X-N8N-API-KEY': connection.apiKey, Accept: 'application/json' },
+        method,
+        headers: {
+          'X-N8N-API-KEY': connection.apiKey,
+          Accept: 'application/json',
+          ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (error) {
@@ -75,14 +115,17 @@ export function createClient(options: ClientOptions): N8nClient {
       );
     }
     if (response.status === 403) {
+      const needs = scope === undefined ? 'workflow read access' : `the "${scope}" scope`;
       throw new ForbiddenError(
         `The API key does not have permission to ${operation} (403). ` +
-          'Create a key with workflow read access in n8n under Settings > n8n API.',
+          `It needs ${needs}; edit the key in n8n under Settings > n8n API.`,
       );
     }
-    // A 404, or a successful response that isn't JSON (e.g. an HTML login page),
-    // means the URL points somewhere that isn't the n8n public API.
-    const notTheApi = response.status === 404 || (response.ok && !isJson(response));
+    // A 404 on a list endpoint, or a successful response that isn't JSON (e.g. an
+    // HTML login page), means the URL points somewhere that isn't the n8n public API.
+    const notTheApi =
+      (response.status === 404 && method === 'GET' && !path.includes('/workflows/')) ||
+      (response.ok && !isJson(response));
     if (notTheApi) {
       throw new ApiNotFoundError(
         `${where} responded, but no n8n API was found at ${API_PATH}. ` +
@@ -90,19 +133,20 @@ export function createClient(options: ClientOptions): N8nClient {
       );
     }
     if (!response.ok) {
+      const detail = await errorMessage(response);
       throw new ApiError(
-        `n8n at ${where} returned ${String(response.status)} when trying to ${operation}.`,
+        `n8n at ${where} returned ${String(response.status)} when trying to ${operation}${detail}.`,
       );
     }
 
-    let body: unknown;
+    let json: unknown;
     try {
-      body = await response.json();
+      json = await response.json();
     } catch {
       throw new UnexpectedResponseError(`n8n returned invalid JSON when trying to ${operation}.`);
     }
 
-    const result = schema.safeParse(body);
+    const result = schema.safeParse(json);
     if (!result.success) {
       const issue = result.error.issues[0];
       const location = issue === undefined ? '' : ` at "${issue.path.join('.')}": ${issue.message}`;
@@ -113,16 +157,18 @@ export function createClient(options: ClientOptions): N8nClient {
     return result.data;
   }
 
+  const workflowPath = (id: string) => `/workflows/${encodeURIComponent(id)}`;
+  const anything = z.unknown();
+
   return {
     async listWorkflows({ tag } = {}) {
       const workflows: ApiWorkflow[] = [];
       let cursor: string | undefined;
       do {
-        const page = await request('/workflows', 'list workflows', workflowListSchema, {
-          limit: String(PAGE_SIZE),
-          cursor,
-          tags: tag,
-          excludePinnedData: 'true',
+        const page = await request('/workflows', {
+          operation: 'list workflows',
+          schema: workflowListSchema,
+          query: { limit: String(PAGE_SIZE), cursor, tags: tag, excludePinnedData: 'true' },
         });
         workflows.push(...page.data);
         cursor = page.nextCursor ?? undefined;
@@ -130,15 +176,69 @@ export function createClient(options: ClientOptions): N8nClient {
       return workflows;
     },
 
-    getWorkflow(id) {
-      return request(
-        `/workflows/${encodeURIComponent(id)}`,
-        `read workflow ${id}`,
-        workflowSchema,
-        { excludePinnedData: 'true' },
-      );
+    getWorkflow(id, { includePinData = false } = {}) {
+      return request(workflowPath(id), {
+        operation: `read workflow ${id}`,
+        schema: workflowSchema,
+        query: { excludePinnedData: includePinData ? 'false' : 'true' },
+      });
+    },
+
+    async updateWorkflow(id, body) {
+      await request(workflowPath(id), {
+        operation: `update workflow ${id}`,
+        schema: anything,
+        method: 'PUT',
+        query: { publishIfActive: 'false' },
+        body,
+        scope: 'workflow:update',
+      });
+    },
+
+    async activateWorkflow(id) {
+      await request(`${workflowPath(id)}/activate`, {
+        operation: `activate workflow ${id}`,
+        schema: anything,
+        method: 'POST',
+        scope: 'workflow:activate',
+      });
+    },
+
+    async deactivateWorkflow(id) {
+      await request(`${workflowPath(id)}/deactivate`, {
+        operation: `deactivate workflow ${id}`,
+        schema: anything,
+        method: 'POST',
+        scope: 'workflow:deactivate',
+      });
+    },
+
+    async listCredentials() {
+      const credentials: ApiCredential[] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await request('/credentials', {
+          operation: 'list credentials',
+          schema: credentialListSchema,
+          query: { limit: String(PAGE_SIZE), cursor },
+          scope: 'credential:list',
+        });
+        credentials.push(...page.data);
+        cursor = page.nextCursor ?? undefined;
+      } while (cursor !== undefined);
+      return credentials;
     },
   };
+}
+
+/** n8n error responses carry a `message`; include it so validation errors are actionable. */
+async function errorMessage(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { message?: unknown };
+    return typeof body.message === 'string' ? `: ${body.message}` : '';
+  } catch {
+    return '';
+  }
 }
 
 function isJson(response: Response): boolean {

@@ -55,3 +55,16 @@ export const workflowListSchema = z.looseObject({
 
 export type ApiWorkflow = z.infer<typeof workflowSchema>;
 export type ApiNode = z.infer<typeof nodeSchema>;
+
+const credentialSchema = z.looseObject({
+  id: z.string(),
+  name: z.string(),
+  type: z.string(),
+});
+
+export const credentialListSchema = z.looseObject({
+  data: z.array(credentialSchema),
+  nextCursor: z.string().nullable().optional(),
+});
+
+export type ApiCredential = z.infer<typeof credentialSchema>;

@@ -160,3 +160,86 @@ describe('error messages', () => {
     expect(error.message).toContain('(from FLOWDIFF_URL)');
   });
 });
+
+describe('writes', () => {
+  const body = { name: 'W', nodes: [], connections: {}, settings: {} };
+
+  it('updates with PUT, the JSON body and publishIfActive=false', async () => {
+    const requests: { url: URL; method: string | undefined; body: unknown }[] = [];
+    const fetchFn = (input: string | URL | Request, init?: RequestInit) => {
+      requests.push({
+        url: new URL(input instanceof Request ? input.url : input),
+        method: init?.method,
+        body: typeof init?.body === 'string' ? (JSON.parse(init.body) as unknown) : undefined,
+      });
+      return Promise.resolve(json({ id: 'abc' }));
+    };
+
+    await createClient({ connection, fetch: fetchFn }).updateWorkflow('abc', body);
+
+    expect(requests[0]?.method).toBe('PUT');
+    expect(requests[0]?.url.pathname).toBe('/api/v1/workflows/abc');
+    expect(requests[0]?.url.searchParams.get('publishIfActive')).toBe('false');
+    expect(requests[0]?.body).toEqual(body);
+  });
+
+  it('activates and deactivates with POST to their own endpoints', async () => {
+    const { fetch, requests } = fakeFetch(() => json({}));
+    const client = createClient({ connection, fetch });
+    await client.activateWorkflow('abc');
+    await client.deactivateWorkflow('abc');
+    expect(requests.map((r) => r.url.pathname)).toEqual([
+      '/api/v1/workflows/abc/activate',
+      '/api/v1/workflows/abc/deactivate',
+    ]);
+  });
+
+  it("includes n8n's validation message in errors", async () => {
+    const { fetch } = fakeFetch(() =>
+      json({ message: 'request/body must NOT have additional properties' }, 400),
+    );
+    const error = await captureError(
+      createClient({ connection, fetch }).updateWorkflow('abc', body),
+    );
+    expect(error.message).toMatch(
+      /returned 400 when trying to update workflow abc: request\/body must NOT have/,
+    );
+  });
+
+  it('names the missing scope on 403', async () => {
+    const { fetch } = fakeFetch(() => json({}, 403));
+    const error = await captureError(createClient({ connection, fetch }).listCredentials());
+    expect(error.message).toMatch(
+      /permission to list credentials \(403\)\. It needs the "credential:list" scope/,
+    );
+  });
+
+  it('lists credentials across pages', async () => {
+    const pages: Record<string, unknown> = {
+      '': { data: [{ id: 'c1', name: 'Example Key', type: 'httpHeaderAuth' }], nextCursor: 'p2' },
+      p2: { data: [{ id: 'c2', name: 'Other', type: 'openAiApi' }], nextCursor: null },
+    };
+    const { fetch } = fakeFetch((url) => json(pages[url.searchParams.get('cursor') ?? '']));
+    const credentials = await createClient({ connection, fetch }).listCredentials();
+    expect(credentials.map((c) => c.name)).toEqual(['Example Key', 'Other']);
+  });
+
+  it('asks for pin data only when requested', async () => {
+    const { fetch, requests } = fakeFetch(() => json(fixture('linear.json')));
+    const client = createClient({ connection, fetch });
+    await client.getWorkflow('fixtureLinear001');
+    await client.getWorkflow('fixtureLinear001', { includePinData: true });
+    expect(requests.map((r) => r.url.searchParams.get('excludePinnedData'))).toEqual([
+      'true',
+      'false',
+    ]);
+  });
+
+  it('never includes the API key in write errors', async () => {
+    const { fetch } = fakeFetch(() => json({ message: 'bad' }, 422));
+    const error = await captureError(
+      createClient({ connection, fetch }).updateWorkflow('abc', body),
+    );
+    expect(`${error.message}\n${error.stack ?? ''}`).not.toContain(API_KEY);
+  });
+});
