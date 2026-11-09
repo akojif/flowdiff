@@ -167,6 +167,10 @@ The Action keeps one comment up to date, writes the full report to the job summa
 - **The missing-credential warning** needs the `credential:list` scope on the push key.
 - **Tested against n8n 2.46.x**; push reports any field a newer n8n version adds that it had to drop.
 
+## Ideas
+
+Next ideas, open for discussion: [scheduled backups](https://github.com/akojif/flowdiff/issues/1) with a ready-made GitHub Actions workflow, and an [MCP mode](https://github.com/akojif/flowdiff/issues/2) so AI assistants can ask what changed and whether it's risky.
+
 ## How I built this
 
 I wrote about why I built flowdiff and how it came together: [flowdiff: a safety net for your n8n workflows](https://medium.com/@akfdev/flowdiff-a-safety-net-for-your-n8n-workflows-44065b913a66) (Medium).
