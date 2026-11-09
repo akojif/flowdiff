@@ -42,6 +42,9 @@ export interface DiffCommandOptions {
   width?: number;
 }
 
+/** Heading for instance-mode diffs and push: before = instance, after = local. */
+export const PUSH_TITLE = 'Changes push would make to the instance';
+
 /** Above this many changed workflows, text output starts with the summary view. */
 export const SUMMARY_THRESHOLD = 5;
 
@@ -105,6 +108,10 @@ export async function diffCommand(options: DiffCommandOptions): Promise<DiffComm
   const differing = comparisons.filter((c) => c.status !== 'unchanged' && c.status !== 'untracked');
   const view = (flags.stat ?? differing.length > SUMMARY_THRESHOLD) ? 'summary' : 'detail';
   const labels = { beforeLabel: sides.beforeLabel, afterLabel: sides.afterLabel };
+  const title =
+    sides.mode === 'instance'
+      ? PUSH_TITLE
+      : `Changes from ${sides.beforeLabel} to ${sides.afterLabel}`;
   const output =
     flags.json === true
       ? renderJson(comparisons, labels)
@@ -114,6 +121,7 @@ export async function diffCommand(options: DiffCommandOptions): Promise<DiffComm
           full: flags.full === true,
           showAll: flags.all === true,
           view,
+          title,
           ...(options.width === undefined ? {} : { width: options.width }),
         });
   return { output, differs: hasDifferences(comparisons) };

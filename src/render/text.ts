@@ -33,6 +33,8 @@ export interface TextRenderOptions {
   view?: 'detail' | 'summary';
   /** Terminal width, used to fit workflow names in the summary view. */
   width?: number;
+  /** Heading, e.g. "Changes push would make to the instance". Default: "before → after". */
+  title?: string;
 }
 
 type Colors = ReturnType<typeof createColors>;
@@ -42,20 +44,21 @@ export function renderText(comparisons: WorkflowComparison[], options: TextRende
   const c = createColors(options.color);
   const ordered = orderForDisplay(comparisons);
   const sides = `${options.beforeLabel} → ${options.afterLabel}`;
+  const title = options.title ?? sides;
 
   const lines: string[] = [];
   if (options.view === 'summary') {
     const count = ordered.filter(isListed).length;
     lines.push(
       c.dim(
-        `Changes in ${String(count)} workflow${count === 1 ? '' : 's'} (${sides}), summary view; ` +
+        `${title}: ${String(count)} workflow${count === 1 ? '' : 's'}, summary view; ` +
           'use --no-stat or `flowdiff diff <workflow>` for details',
       ),
       '',
       ...summaryView(ordered, c, options),
     );
   } else {
-    lines.push(c.dim(sides), '', ...detailView(ordered, c, options));
+    lines.push(c.bold(title), '', ...detailView(ordered, c, options));
   }
 
   lines.push(summaryLine(comparisons, options), ...hints(comparisons, c));

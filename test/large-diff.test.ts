@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ApiWorkflow } from '../src/api/schemas.js';
-import { diffCommand, SUMMARY_THRESHOLD } from '../src/commands/diff.js';
+import { diffCommand, PUSH_TITLE, SUMMARY_THRESHOLD } from '../src/commands/diff.js';
 import { writeConfig, type Config } from '../src/config/config-file.js';
 import {
   compareWorkflowSets,
@@ -30,6 +30,7 @@ const options: TextRenderOptions = {
   color: false,
   full: false,
   width: 110,
+  title: PUSH_TITLE,
 };
 
 function comparisonsOf(fixture: LargeFixture): WorkflowComparison[] {
@@ -190,7 +191,7 @@ describe('detail view', () => {
       (c) => c.id === 'largeFixture43',
     );
     expect(renderText(comparisons, options)).toMatchInlineSnapshot(`
-      "instance → local
+      "Changes push would make to the instance
 
       ~ Ticket Import 43 (largeFixture43)  active
           ⚠ "Transform" › jsCode references "Fetch Records", which is not a node in this workflow
@@ -299,7 +300,7 @@ describe('summary threshold in the diff command', () => {
     const run = await project();
     const { output } = await run({ stat: true }, 'largeFixture22');
     expect(isSummary(output)).toBe(true);
-    expect(output).toContain('Changes in 1 workflow ');
+    expect(output).toContain('Changes push would make to the instance: 1 workflow, summary view');
   });
 
   it('does not count untracked workflows toward the threshold', async () => {

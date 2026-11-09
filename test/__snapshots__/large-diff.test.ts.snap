@@ -1,7 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`summary view > renders one line per workflow for the 50-workflow fixture 1`] = `
-"Changes in 35 workflows (instance → local), summary view; use --no-stat or \`flowdiff diff <workflow>\` for details
+"Changes push would make to the instance: 35 workflows, summary view; use --no-stat or \`flowdiff diff <workflow>\` for details
 
 ! Shipment Alert 39 (largeFixture39)                 deleted on instance
 ~ Ticket Import 43 (largeFixture43)          active  0 behavior   1 cosmetic   1 rename  ⚠ 1 broken reference

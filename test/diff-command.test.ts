@@ -50,13 +50,13 @@ describe('local vs instance', () => {
     expect(result.output).toContain('No changes (3 unchanged).');
   });
 
-  it('shows local edits as instance → local', async () => {
+  it('shows local edits under the push heading', async () => {
     await editFile(LINEAR_FILE, (w) => (w.active = true));
 
     const result = await run();
 
     expect(result.differs).toBe(true);
-    expect(result.output).toContain('instance → local');
+    expect(result.output).toContain('Changes push would make to the instance');
     expect(result.output).toContain('status  inactive → active');
   });
 
@@ -242,7 +242,7 @@ describe('between git refs', () => {
     const result = await run({ target: 'main..feature', getClient: noClient });
 
     expect(result.differs).toBe(true);
-    expect(result.output).toContain('main → feature');
+    expect(result.output).toContain('Changes from main to feature');
     expect(result.output).toContain('status  inactive → active');
   });
 
