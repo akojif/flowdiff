@@ -9,12 +9,15 @@ This is a public, open-source portfolio project. Code quality, tests, and the RE
 
 - `flowdiff init` – create `flowdiff.config.json` (instance URL, workflows folder). Never store the API key in config. `FLOWDIFF_URL` overrides the config's instance URL when set.
 - `flowdiff pull` – download workflows as normalized JSON, one file per workflow: `workflows/<slug>.<id>.json`
-- `flowdiff status` – per workflow: unchanged / modified locally / modified on instance / conflict
+- `flowdiff status` – per workflow: unchanged / modified locally / modified on instance / conflict / deleted on instance / new locally / no pull record (content hashes vs `.flowdiff/state.json`, tag scope); `--json`, `--all`
 - `flowdiff diff [workflow]` – readable diff: local vs instance (before = instance, after = local, i.e. what push would change), or between git refs (`main..feature`, no network needed); `--json` (never truncated), `--full`, `--include-layout`, `--exit-code`
   - Local vs instance: instance-only workflows are "untracked" (one dim summary line; listed with `--all`; always in JSON; ignored by `--exit-code`). A local workflow with a pull record in `.flowdiff/state.json` that is gone from the instance is "deleted on instance", distinct from a new local-only workflow.
 - Tag scope: optional `tag` in `flowdiff.config.json` applies to pull, diff, status and push. Precedence: `--tag <name>` > `--no-tag` > config. Scope = instance workflows with the tag plus every workflow already tracked locally. Git-ref diffs ignore the tag.
 - Exit codes: 0 = success / no changes, 1 = changes found (`--exit-code`) or pull conflicts, 2 = any error
-- `flowdiff push [workflow]` – upload local changes; always shows diff + asks for confirmation; supports `--dry-run`
+- `flowdiff push [workflow]` – upload local changes; always shows diff + asks for confirmation; supports `--dry-run`, `--force`, `--apply-active`
+  - Pure planner (`src/push/plan.ts`) + executor (`src/push/execute.ts`). Skips new-locally and deleted-on-instance workflows (never creates or recreates), doesn't push tag changes, changes active only with `--apply-active`, asks separately for workflows with broken references, refuses without an interactive terminal (no `--yes`).
+  - Per workflow: re-fetch, re-check dev guard + pull record, backup to `.flowdiff/backups/<id>/<timestamp>.json`, PUT with `publishIfActive=false`, optional activate/deactivate, then refresh the local file and pull record.
+  - Exit codes: 0 = pushed (or nothing to do), 1 = something refused/declined, 2 = an update failed.
 
 ## Stack
 
@@ -84,7 +87,7 @@ Verified against n8n 2.46 source and live (2026-11-09):
 0. Setup: repo, TypeScript, ESLint, Vitest, CI, folder structure, `.gitignore`, made-up fixtures
 1. `init` + `pull` + normalization (done when two pulls in a row produce no git changes)
 2. Diff engine + `diff` command (done when added/removed/renamed/modified nodes and connections are tested)
-3. `status` + `push` with all safety rules above
+3. `status` + `push` with all safety rules above (built; first live push still needs the author's approval)
    - push must not wipe pinData or staticData on the instance; verify how the update endpoint treats missing fields before shipping push.
    - push must not recreate workflows that are "deleted on instance" (pulled before, now gone) without explicit confirmation.
    - status and push use the same tag scope as diff (`resolveTagScope`).
@@ -96,5 +99,4 @@ Verified against n8n 2.46 source and live (2026-11-09):
 
 - Future CI push mode: needs a non-interactive path (no `--yes` today) with extra safeguards, e.g. an explicit allow-list of workflow ids, `--exit-code` on refusals, and a separate write key.
 - Phase 4: `--exit-code=behavior`, so CI only fails on behavior changes (not cosmetic-only diffs). Workflows with broken-reference warnings count as behavior even when the rename itself is cosmetic; use `hasBehaviorImpact` from `src/diff/classify.ts`.
-- Clearer diff header than "instance → local", e.g. "Changes push would make to the instance" (and a matching phrasing for git ranges).
 - Opt-in node defaults cache: `flowdiff defaults fetch --n8n-version <v>` downloads `n8n-nodes-base@<v>`'s `dist/types/nodes.json` from npm into `.flowdiff/cache/` (gitignored, never bundled: that data is under n8n's Sustainable Use License, and flowdiff stays MIT). A parameter missing on one side and equal to its declared default for that node type/version on the other would then not count as a change. Unknown type/version: show the change. Note: npm's `latest` tag for n8n-nodes-base is stale; use the version matching the instance (e.g. the `stable` tag).
