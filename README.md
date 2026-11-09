@@ -40,6 +40,9 @@ Changes from main to feature
               +return items.filter((item) => item.json.total > 0);
 
 4 changed (3 with behavior changes), 1 unchanged, 1 possible default, 1 broken reference, 1 possible secret.
+Possible defaults: likely removed by the n8n editor on save; flowdiff pull refreshes your baseline.
+Broken references: these expressions name nodes that don't exist, so those nodes will fail.
+Possible secrets are redacted (--show-secrets shows them); use n8n credentials and rotate any real key.
 ```
 
 The demo uses made-up workflows; `node scripts/demo-repo.mjs <dir>` recreates it.

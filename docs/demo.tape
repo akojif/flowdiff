@@ -18,18 +18,29 @@ Enter
 Type "rm -rf /tmp/flowdiff-demo && node scripts/demo-repo.mjs /tmp/flowdiff-demo >/dev/null && cd /tmp/flowdiff-demo && clear"
 Enter
 Sleep 1s
+# Run the first command while hidden, so the very first frame already shows its output.
+Type "flowdiff diff main..feature"
+Enter
+Sleep 2s
 Show
 
-Type "flowdiff diff main..feature"
-Sleep 400ms
-Enter
-Sleep 7s
+# Hold the detailed diff long enough to read.
+Sleep 8s
 
-Type "clear && flowdiff diff main..feature --stat"
+# Clear while hidden, so each command starts at the top of a fresh screen.
+Hide
+Type "clear"
+Enter
+Show
+Type "flowdiff diff main..feature --stat"
 Sleep 400ms
 Enter
 Sleep 4s
 
+Hide
+Type "clear"
+Enter
+Show
 Type `flowdiff diff main..feature --exit-code behavior > /dev/null; echo "exit code: $?"`
 Sleep 400ms
 Enter
