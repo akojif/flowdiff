@@ -12,6 +12,11 @@ export const configSchema = z.strictObject({
   workflowsDir: z.string().min(1).default('workflows'),
   /** Only track workflows with this tag. Applies to pull, diff, status and push. */
   tag: z.string().trim().min(1).optional(),
+  /**
+   * Tag push requires on a workflow, both locally and on the instance. Falls back
+   * to `tag`. `false` explicitly allows pushing any workflow (not recommended).
+   */
+  requireTag: z.union([z.string().trim().min(1), z.literal(false)]).optional(),
 });
 
 export type Config = z.infer<typeof configSchema>;
