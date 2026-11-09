@@ -50,8 +50,8 @@ jobs:
         id: published
         run: |
           version="$(node -p "require('./package.json').version")"
-          if npm view "flowdiff@$version" version >/dev/null 2>&1; then
-            echo "::notice::flowdiff@$version is already published; nothing to do."
+          if npm view "@akojif/flowdiff@$version" version >/dev/null 2>&1; then
+            echo "::notice::@akojif/flowdiff@$version is already published; nothing to do."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 

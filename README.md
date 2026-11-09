@@ -60,8 +60,10 @@ It's built for teams who want Git-based review and CI checks for their workflows
 Requires Node.js 22 or later.
 
 ```sh
-npm install -g flowdiff
+npm install -g @akojif/flowdiff   # installs the `flowdiff` command
 ```
+
+Or run it without installing: `npx @akojif/flowdiff --help`.
 
 ```sh
 mkdir n8n-workflows && cd n8n-workflows && git init

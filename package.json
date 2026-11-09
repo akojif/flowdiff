@@ -1,5 +1,5 @@
 {
-  "name": "flowdiff",
+  "name": "@akojif/flowdiff",
   "version": "0.1.0",
   "description": "Version control and readable diffs for n8n workflows, via the n8n public API.",
   "keywords": [
@@ -32,6 +32,9 @@
   ],
   "engines": {
     "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsup",

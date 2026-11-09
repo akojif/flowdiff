@@ -1,4 +1,4 @@
-# flowdiff
+# @akojif/flowdiff
 
 ## 0.1.0
 
