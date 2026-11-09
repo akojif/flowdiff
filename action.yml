@@ -46,7 +46,7 @@ runs:
     # The exact version is kept in sync with package.json by scripts/sync-action-version.mjs.
     - id: flowdiff
       shell: bash
-      run: npx --yes @akojif/flowdiff@0.1.1 github-action
+      run: npx --yes @akojif/flowdiff@0.1.2 github-action
       # Same input names a JavaScript action would get (what flowdiff 0.1.1+ reads).
       env:
         INPUT_FAIL-ON: ${{ inputs.fail-on }}

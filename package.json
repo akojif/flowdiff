@@ -1,6 +1,6 @@
 {
   "name": "@akojif/flowdiff",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Version control and readable diffs for n8n workflows, via the n8n public API.",
   "keywords": [
     "n8n",
