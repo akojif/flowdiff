@@ -69,7 +69,8 @@ Verified against n8n 2.46 source and live (2026-11-09):
 ## Safety rules (important)
 
 - Development runs against the author's LIVE n8n instance.
-- During development, `push` MUST refuse any workflow that does not have the tag `flowdiff-test`. Do not remove or bypass this guard.
+- Push guard (`src/config/push-guard.ts`): push only touches workflows carrying the guard tag, locally AND on the instance. Guard = `requireTag` (string) if set, else the tag scope's tag (`tag` / `--tag`); nothing set → push refuses everything and tells the user what to add; `requireTag: false` is the only way to allow untagged workflows. `--force`, `--tag` and `--no-tag` never loosen a `requireTag`. Do not weaken these defaults.
+- During development, the author's config sets `"requireTag": "flowdiff-test"`.
 - Never log, print, or write the API key. Read it only from env: `FLOWDIFF_API_KEY` (loaded from `.env`, which is gitignored). The instance URL comes from `FLOWDIFF_URL` if set, otherwise from `flowdiff.config.json`.
 - Before overwriting a workflow on push, save a backup of the instance version to `.flowdiff/backups/`.
 - Refuse to push if the instance version changed since the last pull, unless `--force`.

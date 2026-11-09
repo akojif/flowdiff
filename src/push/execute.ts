@@ -8,7 +8,8 @@ import { serializeWorkflow } from '../normalize/serialize.js';
 import { writeBackup } from '../workspace/backups.js';
 import { workflowFileName } from '../workspace/paths.js';
 import { hashContent, readState, writeState } from '../workspace/state.js';
-import { DEV_GUARD_TAG, type PlannedPush } from './plan.js';
+import type { PushGuard } from '../config/push-guard.js';
+import type { PlannedPush } from './plan.js';
 
 export interface PushResult {
   id: string;
@@ -25,12 +26,13 @@ export interface ExecuteOptions {
   client: N8nClient;
   /** Overwrite even if the instance changed since the last pull. */
   force: boolean;
+  guard: Exclude<PushGuard, { kind: 'unset' }>;
   now: () => Date;
 }
 
 /**
  * Pushes planned workflows one by one. For each: fetch the instance version
- * again, re-check the dev guard and the pull record, back it up, update, apply
+ * again, re-check the push guard and the pull record, back it up, update, apply
  * activation only if planned, then refresh the local file and pull record from
  * what the instance stored.
  */
@@ -46,20 +48,22 @@ export async function executePush(
 }
 
 /**
- * The workflow as the list endpoint returns it, or undefined if it isn't in the
- * list filtered by the dev-guard tag.
+ * The workflow as the list endpoint returns it, or undefined if it isn't listed
+ * (filtered by the guard tag when there is one).
  *
  * Every hash flowdiff compares must come from the same endpoint: the single GET
  * (GET /workflows/{id}) returns extra fields such as `description` and
  * `sourceWorkflowId` that the list (used by pull and status) leaves out, so
- * hashes from the two never match. Filtering by tag keeps this fast on large
- * instances; while the dev guard exists, a pushable workflow always has the tag.
+ * hashes from the two never match. Filtering by the guard tag keeps this fast on
+ * large instances; a pushable workflow always has that tag. With the guard off
+ * (requireTag: false), the full list is read.
  */
 export async function listedVersion(
   client: N8nClient,
   id: string,
+  guardTag: string | undefined,
 ): Promise<ApiWorkflow | undefined> {
-  const listed = await client.listWorkflows({ tag: DEV_GUARD_TAG });
+  const listed = await client.listWorkflows(guardTag === undefined ? {} : { tag: guardTag });
   return listed.find((workflow) => workflow.id === id && workflow.isArchived !== true);
 }
 
@@ -69,7 +73,8 @@ export function comparableHash(workflow: ApiWorkflow): string {
 }
 
 async function pushOne(plan: PlannedPush, options: ExecuteOptions): Promise<PushResult> {
-  const { cwd, config, client, force, now } = options;
+  const { cwd, config, client, force, now, guard } = options;
+  const guardTag = guard.kind === 'tag' ? guard.tag : undefined;
   const result = (
     outcome: PushResult['outcome'],
     message: string,
@@ -86,15 +91,16 @@ async function pushOne(plan: PlannedPush, options: ExecuteOptions): Promise<Push
   //    It must be list-shaped, like the copy pull hashed (see listedVersion).
   let listed;
   try {
-    listed = await listedVersion(client, plan.id);
+    listed = await listedVersion(client, plan.id, guardTag);
   } catch (error) {
     return result('failed', `could not read the instance version: ${(error as Error).message}`);
   }
   if (listed === undefined) {
-    return result(
-      'refused',
-      `dev guard: the instance version no longer has the "${DEV_GUARD_TAG}" tag (or was deleted)`,
-    );
+    const why =
+      guardTag === undefined
+        ? 'it is no longer on the instance'
+        : `push guard: the instance version no longer has the tag "${guardTag}" (or was deleted)`;
+    return result('refused', why);
   }
   const state = await readState(cwd);
   if (!force && comparableHash(listed) !== state.workflows[plan.id]?.hash) {
@@ -140,8 +146,8 @@ async function pushOne(plan: PlannedPush, options: ExecuteOptions): Promise<Push
   // 4. Refresh the local file and pull record from what the instance now stores.
   let stored;
   try {
-    stored = await listedVersion(client, plan.id);
-    if (stored === undefined) throw new Error('it no longer appears in the tagged workflow list');
+    stored = await listedVersion(client, plan.id, guardTag);
+    if (stored === undefined) throw new Error('it no longer appears in the workflow list');
   } catch (error) {
     return result(
       'pushed',

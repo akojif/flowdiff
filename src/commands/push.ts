@@ -6,6 +6,7 @@ import type { ApiCredential } from '../api/schemas.js';
 import { readConfig, type Config } from '../config/config-file.js';
 import { resolveConnection } from '../config/connection.js';
 import { loadDotEnv, readEnv } from '../config/env.js';
+import { describePushGuard, resolvePushGuard, unsetGuardMessage } from '../config/push-guard.js';
 import { describeTagScope, resolveTagScope } from '../config/tag-scope.js';
 import { executePush, type PushResult } from '../push/execute.js';
 import { planPush, type NotPushed, type PlannedPush } from '../push/plan.js';
@@ -49,6 +50,11 @@ export async function pushCommand(
   const c = pc.createColors(options.color);
   const force = flags.force === true;
   const scope = resolveTagScope(config, flags.tag);
+  const guard = resolvePushGuard(config, scope);
+  if (guard.kind === 'unset') {
+    io.log(c.red(unsetGuardMessage()));
+    return { exitCode: 1, results: [] };
+  }
   const loaded = await loadInstanceScope(cwd, config, client, scope.tag);
   const statuses = computeStatuses(loaded);
 
@@ -77,11 +83,13 @@ export async function pushCommand(
     selected,
     force,
     applyActive: flags.applyActive === true,
+    guard,
   });
   let planned = decisions.filter((d): d is PlannedPush => d.action === 'push');
   const notPushed = decisions.filter((d): d is NotPushed => d.action !== 'push');
 
   io.log(c.dim(`Instance: ${config.instanceUrl}${describeTagScope(scope)}`));
+  io.log(c.dim(describePushGuard(guard)));
   if (credentials === undefined) {
     io.log(c.yellow('Credential check skipped: the API key lacks the "credential:list" scope.'));
   }
@@ -169,6 +177,7 @@ export async function pushCommand(
     config,
     client,
     force,
+    guard,
     now: options.now ?? (() => new Date()),
   });
   io.log('');

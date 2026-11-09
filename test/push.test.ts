@@ -12,7 +12,11 @@ import { comparableHash, listedVersion } from '../src/push/execute.js';
 import { buildUpdateBody } from '../src/push/request-body.js';
 import { fakeClient, loadAllFixtures, loadFixture } from './helpers.js';
 
-const config: Config = { instanceUrl: 'https://n8n.example.com', workflowsDir: 'workflows' };
+const config: Config = {
+  instanceUrl: 'https://n8n.example.com',
+  workflowsDir: 'workflows',
+  requireTag: 'flowdiff-test',
+};
 const LINEAR = join('workflows', 'fixture-linear.fixtureLinear001.json');
 const IF_BRANCH = join('workflows', 'fixture-if-branch.fixtureIfBranch1.json');
 const CRED = join('workflows', 'fixture-credential-reference.fixtureCredRef01.json');
@@ -248,13 +252,13 @@ describe('push happy path', () => {
   });
 });
 
-describe('dev guard', () => {
+describe('push guard', () => {
   it('refuses a workflow without the flowdiff-test tag, even with --force', async () => {
     await editLocal(IF_BRANCH, (w) => (w.active = false));
     for (const flags of [{}, { force: true }]) {
       const { output, exitCode } = await run({ flags });
       expect(output).toContain(
-        'refused  Fixture: IF Branch (fixtureIfBranch1): dev guard: needs the "flowdiff-test" tag (missing locally and on the instance)',
+        'refused  Fixture: IF Branch (fixtureIfBranch1): push guard: needs the tag "flowdiff-test" (requireTag in flowdiff.config.json), missing locally and on the instance',
       );
       expect(exitCode).toBe(1);
     }
@@ -276,7 +280,9 @@ describe('dev guard', () => {
       },
       flags: { force: true },
     });
-    expect(results[0]?.message).toContain('dev guard');
+    expect(results[0]?.message).toContain(
+      'push guard: the instance version no longer has the tag "flowdiff-test"',
+    );
     expect(updates()).toEqual([]);
   });
 });
@@ -444,7 +450,7 @@ describe('status and push agree on the instance version', () => {
     const recorded = JSON.parse(await readFile(join(cwd, '.flowdiff', 'state.json'), 'utf8')) as {
       workflows: Record<string, { hash: string }>;
     };
-    const listed = await listedVersion(client, 'fixtureLinear001');
+    const listed = await listedVersion(client, 'fixtureLinear001', 'flowdiff-test');
     if (listed === undefined) throw new Error('not listed');
 
     expect(comparableHash(listed)).toBe(recorded.workflows.fixtureLinear001?.hash);

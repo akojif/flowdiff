@@ -7,17 +7,11 @@ import {
   type Change,
   type WorkflowComparison,
 } from '../diff/index.js';
+import type { PushGuard } from '../config/push-guard.js';
 import type { NormalizedWorkflow } from '../normalize/normalize.js';
 import type { WorkflowFile } from '../workspace/local-files.js';
 import type { WorkflowStatus } from '../workspace/status.js';
 import { buildUpdateBody } from './request-body.js';
-
-/**
- * Development guard (CLAUDE.md safety rules): push refuses any workflow that
- * does not carry this tag, both locally and on the instance. No flag bypasses
- * it, including --force.
- */
-export const DEV_GUARD_TAG = 'flowdiff-test';
 
 export interface PlannedPush {
   action: 'push';
@@ -56,6 +50,12 @@ export interface PlanInput {
   selected?: ReadonlySet<string> | undefined;
   force: boolean;
   applyActive: boolean;
+  /**
+   * The resolved push guard (see resolvePushGuard). With a tag, workflows without
+   * it, locally or on the instance, are refused; --force does not bypass this.
+   * An unset guard must be handled before planning.
+   */
+  guard: Exclude<PushGuard, { kind: 'unset' }>;
 }
 
 const SKIP_REASONS: Partial<Record<WorkflowStatus['status'], string>> = {
@@ -87,17 +87,20 @@ function decide(status: WorkflowStatus, input: PlanInput): PushDecision {
     return { action: 'skip', id, name, reason: 'missing on one side' };
   }
 
-  const missingTag = [
-    local.workflow.tags.includes(DEV_GUARD_TAG) ? '' : 'locally',
-    remote.tags.includes(DEV_GUARD_TAG) ? '' : 'on the instance',
-  ].filter(Boolean);
-  if (missingTag.length > 0) {
-    return {
-      action: 'refuse',
-      id,
-      name,
-      reason: `dev guard: needs the "${DEV_GUARD_TAG}" tag (missing ${missingTag.join(' and ')})`,
-    };
+  if (input.guard.kind === 'tag') {
+    const { tag, source } = input.guard;
+    const missingTag = [
+      local.workflow.tags.includes(tag) ? '' : 'locally',
+      remote.tags.includes(tag) ? '' : 'on the instance',
+    ].filter(Boolean);
+    if (missingTag.length > 0) {
+      return {
+        action: 'refuse',
+        id,
+        name,
+        reason: `push guard: needs the tag "${tag}" (${source}), missing ${missingTag.join(' and ')}`,
+      };
+    }
   }
 
   if ((status.status === 'conflict' || status.status === 'no-pull-record') && !input.force) {
