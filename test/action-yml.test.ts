@@ -35,14 +35,14 @@ describe('action.yml', () => {
 
   it('passes every input to the command under the name the code reads', () => {
     for (const input of declaredInputs()) {
-      // Underscores: the step runs through bash, which drops names like INPUT_FAIL-ON.
+      // Underscores: npx runs flowdiff through /bin/sh (dash on Ubuntu), which drops INPUT_FAIL-ON.
       const envName = `INPUT_${input.toUpperCase().replace(/-/g, '_')}`;
       expect(actionYml).toContain(`${envName}: \${{ inputs.${input} }}`);
       expect(getInput({ [envName]: 'value' }, input)).toBe('value');
     }
   });
 
-  it('only uses environment variable names bash keeps (a hyphen would silently drop the input)', () => {
+  it('only uses environment variable names dash keeps (a hyphen would silently drop the input)', () => {
     const envSection = /^ {6}env:\n((?: {8}.*\n)+)/m.exec(actionYml)?.[1] ?? '';
     const names = [...envSection.matchAll(/^ {8}([^:#\s]+):/gm)].map((m) => m[1] ?? '');
     expect(names.length).toBeGreaterThan(0);

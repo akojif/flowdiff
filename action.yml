@@ -47,8 +47,8 @@ runs:
     - id: flowdiff
       shell: bash
       run: npx --yes @akojif/flowdiff@0.1.2 github-action
-      # Underscores, not hyphens: this step runs through bash, which drops environment
-      # variables whose names aren't valid shell identifiers (e.g. INPUT_FAIL-ON).
+      # Underscores, not hyphens: npx starts flowdiff through /bin/sh, which is dash on
+      # Ubuntu runners, and dash drops variables like INPUT_FAIL-ON (verified on a runner).
       env:
         INPUT_FAIL_ON: ${{ inputs.fail-on }}
         INPUT_COMMENT: ${{ inputs.comment }}
