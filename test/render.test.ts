@@ -160,6 +160,7 @@ describe('renderText', () => {
         active: false,
         changes: [],
         warnings: [],
+        secrets: [],
       },
       {
         id: 'untracked0000001',
@@ -168,6 +169,7 @@ describe('renderText', () => {
         active: false,
         changes: [],
         warnings: [],
+        secrets: [],
       },
       {
         id: 'untracked0000002',
@@ -176,6 +178,7 @@ describe('renderText', () => {
         active: false,
         changes: [],
         warnings: [],
+        secrets: [],
       },
       ...compareOne(linear, linear),
     ];
@@ -213,6 +216,7 @@ describe('renderText', () => {
           active: false,
           changes: [],
           warnings: [],
+          secrets: [],
         },
         ...compareOne(linear, linear),
       ];

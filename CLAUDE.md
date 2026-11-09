@@ -43,6 +43,7 @@ This is a public, open-source portfolio project. Code quality, tests, and the RE
   - A parameter key present on one side only, with a scalar or empty value, is labelled `possibleDefault` (the n8n editor strips defaults on save). Never hidden: shown after real changes and counted separately.
   - `classifyChange`: renames, notes, layout, tags, groups and possible defaults are cosmetic; everything else (including anything new) is behavior.
   - `findBrokenReferences`: expressions/Code nodes referencing a node name that doesn't exist (`$('Name')`, `$node["Name"]`, `$node.Name`, `$items('Name')`; sticky notes ignored). Reported as warnings on the after side of changed or new workflows.
+- `src/secrets/` – heuristic secret scanner (known token formats, private keys, bearer/basic auth, URL credentials, secrets assigned in code, literal values at sensitive names incl. n8n name/value header lists). `compareWorkflowSets` redacts BOTH workflows before diffing (fingerprinted markers like `‹redacted bearer token #3f9a›`), so every renderer gets redacted data; `--show-secrets` (diff, push) turns it off. The push request body is always built from the real local file, never the redacted copy. Warnings in diff, status, pull ("check before committing") and push; push asks (default No) only when it adds or changes a secret. Test tokens are assembled at run time.
 - `src/render/` – turn `Change[]` into readable terminal text or JSON.
   - Text: behavior changes first, then `cosmetic:` and `possible defaults:` groups. Display order: deleted, then workflows with broken-reference warnings, then changed (active, most behavior, most cosmetic first), then new. Summary view (one line per workflow) above 5 changed workflows; `--stat` / `--no-stat` force it on/off.
   - JSON: name/id order, never truncated, each change has `impact`, each workflow has `counts` and `warnings`.
@@ -95,10 +96,11 @@ Verified against n8n 2.46 source and live (2026-11-09):
    - status and push use the same tag scope as diff (`resolveTagScope`).
    - push must refuse, or ask for explicit confirmation, when the workflows being pushed have broken-reference warnings.
 4. Polish: GitHub Action posting diffs as PR comments, hard-coded-secret scanner, README with `vhs` demo, npm publish
-   - The GitHub Action must redact values the secret scanner flags before posting diffs as PR comments.
+   - The GitHub Action must redact values the secret scanner flags before posting diffs as PR comments. It must NEVER allow `--show-secrets` (no input, no passthrough).
 
 ## Backlog
 
+- README: state that the secret scanner is heuristic and doesn't catch every secret (a clean result means "no known pattern found").
 - Description syncing: the list endpoint doesn't return `description`, so it is never pulled or pushed (n8n keeps it untouched). Syncing it would mean fetching each workflow with the single GET (one request per workflow) and hashing that shape everywhere.
 - Future CI push mode: needs a non-interactive path (no `--yes` today) with extra safeguards, e.g. an explicit allow-list of workflow ids, `--exit-code` on refusals, and a separate write key.
 - Phase 4: `--exit-code=behavior`, so CI only fails on behavior changes (not cosmetic-only diffs). Workflows with broken-reference warnings count as behavior even when the rename itself is cosmetic; use `hasBehaviorImpact` from `src/diff/classify.ts`.

@@ -1,6 +1,7 @@
 import { compare } from '../diff/compare.js';
 import type { NormalizedWorkflow } from '../normalize/normalize.js';
 import { serializeWorkflow } from '../normalize/serialize.js';
+import { scanWorkflowSecrets } from '../secrets/scan.js';
 import type { WorkflowFile } from './local-files.js';
 import { hashContent, type State } from './state.js';
 
@@ -21,6 +22,8 @@ export interface WorkflowStatus {
   status: SyncStatus;
   /** Local file, when there is one. */
   file: string | undefined;
+  /** Possible hard-coded secrets in the local file. */
+  secrets: number;
 }
 
 export interface StatusInput {
@@ -56,12 +59,19 @@ export function computeStatuses({ local, instance, state }: StatusInput): Workfl
       // only possible if the record is stale, so treat it as unknown.
       return 'no-pull-record';
     })();
-    statuses.push({ id, name: workflow.name, status, file });
+    statuses.push({
+      id,
+      name: workflow.name,
+      status,
+      file,
+      secrets: scanWorkflowSecrets(workflow).length,
+    });
   }
 
   for (const [id, remote] of instance) {
-    if (!local.has(id))
-      statuses.push({ id, name: remote.name, status: 'untracked', file: undefined });
+    if (!local.has(id)) {
+      statuses.push({ id, name: remote.name, status: 'untracked', file: undefined, secrets: 0 });
+    }
   }
   return statuses.sort((a, b) => compare(a.name, b.name) || compare(a.id, b.id));
 }

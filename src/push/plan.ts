@@ -9,6 +9,7 @@ import {
 } from '../diff/index.js';
 import type { PushGuard } from '../config/push-guard.js';
 import type { NormalizedWorkflow } from '../normalize/normalize.js';
+import { REDACTION_PREFIX, redactWorkflow, scanWorkflowSecrets } from '../secrets/scan.js';
 import type { WorkflowFile } from '../workspace/local-files.js';
 import type { WorkflowStatus } from '../workspace/status.js';
 import { buildUpdateBody } from './request-body.js';
@@ -24,6 +25,8 @@ export interface PlannedPush {
   /** For rendering the diff (instance → local). */
   comparison: WorkflowComparison;
   brokenReferences: BrokenReference[];
+  /** This push adds or changes a possible secret (unchanged existing ones don't count). */
+  changesSecret: boolean;
   credentialWarnings: string[];
   /** Things push will not do for this workflow, e.g. tag changes. */
   notes: string[];
@@ -50,6 +53,8 @@ export interface PlanInput {
   selected?: ReadonlySet<string> | undefined;
   force: boolean;
   applyActive: boolean;
+  /** Show secret values in the diff. The request body is never redacted. */
+  showSecrets: boolean;
   /**
    * The resolved push guard (see resolvePushGuard). With a tag, workflows without
    * it, locally or on the instance, are refused; --force does not bypass this.
@@ -133,8 +138,14 @@ function decide(status: WorkflowStatus, input: PlanInput): PushDecision {
     return { action: 'skip', id, name, reason: `nothing push can change (${notes.join('; ')})` };
   }
 
+  // The request body always comes from the real local file; only what is shown is redacted.
   const { body, dropped } = buildUpdateBody(local.workflow);
   const brokenReferences = findBrokenReferences(local.workflow);
+  const redactedChanges = diffWorkflows(redactWorkflow(remote), redactWorkflow(local.workflow));
+  const secrets = scanWorkflowSecrets(local.workflow);
+  const addedNodeIds = new Set(
+    changes.flatMap((c) => (c.kind === 'node-added' ? [c.node.id] : [])),
+  );
   return {
     action: 'push',
     id,
@@ -147,10 +158,13 @@ function decide(status: WorkflowStatus, input: PlanInput): PushDecision {
       name,
       status: 'changed',
       active: remote.active,
-      changes: visible(changes, input),
+      changes: visible(input.showSecrets ? changes : redactedChanges, input),
       warnings: brokenReferences,
+      secrets,
     },
     brokenReferences,
+    changesSecret:
+      redactedChanges.some(addsOrChangesSecret) || secrets.some((f) => addedNodeIds.has(f.node.id)),
     credentialWarnings: checkCredentials(local.workflow, input.credentials),
     notes,
     activeChange:
@@ -160,6 +174,34 @@ function decide(status: WorkflowStatus, input: PlanInput): PushDecision {
           : 'deactivate'
         : undefined,
   };
+}
+
+/**
+ * Whether a value change (from redacted workflows) introduces a secret: a
+ * redaction marker in an added or new value, or on an added line. Removed and
+ * unchanged secrets don't count; context lines in a text diff are ignored.
+ * Secrets inside newly added nodes are handled by the caller.
+ */
+function addsOrChangesSecret(change: Change): boolean {
+  if (!('change' in change)) return false;
+  const value = change.change;
+  switch (value.type) {
+    case 'added':
+      return containsMarker(value.value);
+    case 'modified':
+      return containsMarker(value.to);
+    case 'text':
+      return value.hunks.some((hunk) =>
+        hunk.lines.some((line) => line.startsWith('+') && line.includes(REDACTION_PREFIX)),
+      );
+    default:
+      return false;
+  }
+}
+
+function containsMarker(value: unknown): boolean {
+  // JSON.stringify(undefined) returns undefined at runtime, despite its declared type.
+  return value !== undefined && JSON.stringify(value).includes(REDACTION_PREFIX);
 }
 
 /** The diff shown before confirming: without the active change unless it will be applied. */

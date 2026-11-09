@@ -21,6 +21,8 @@ export interface DiffFlags {
   all?: boolean;
   /** `--stat` (true) forces the summary view, `--no-stat` (false) forces details. */
   stat?: boolean;
+  /** Show values that look like secrets instead of redacting them. */
+  showSecrets?: boolean;
   json?: boolean;
   includeLayout?: boolean;
   full?: boolean;
@@ -100,6 +102,7 @@ export async function diffCommand(options: DiffCommandOptions): Promise<DiffComm
 
   const compared = compareWorkflowSets(sides.before, sides.after, {
     includeLayout: flags.includeLayout === true,
+    showSecrets: flags.showSecrets === true,
     // Local vs instance: whether a workflow runs is decided by the instance.
     activeSide: sides.mode === 'instance' ? 'before' : 'after',
   });

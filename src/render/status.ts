@@ -77,6 +77,13 @@ export function renderStatusText(statuses: WorkflowStatus[], options: StatusRend
       ? `Everything is in sync (${String(unchanged)} unchanged).`
       : `${String(listed.length)} need attention, ${String(unchanged)} unchanged.`,
   );
+  const withSecrets = statuses.filter((s) => s.secrets > 0);
+  if (withSecrets.length > 0) {
+    lines.push(c.yellow('Possible hard-coded secrets in local files (check before committing):'));
+    for (const s of withSecrets) {
+      lines.push(c.yellow(`  ⚠ ${s.name} (${s.id}): ${String(s.secrets)}`));
+    }
+  }
   lines.push(
     ...untrackedLines(
       statuses.filter((s) => s.status === 'untracked'),

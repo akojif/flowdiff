@@ -163,6 +163,7 @@ describe('status output', () => {
       name: 'Fixture: Linear',
       status: 'unchanged',
       file: LINEAR,
+      secrets: 0,
     });
   });
 });

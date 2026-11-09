@@ -14,6 +14,7 @@ import {
   hasDifferences,
   isPossibleDefaultChange,
 } from '../diff/index.js';
+import type { SecretFinding } from '../secrets/scan.js';
 import { untrackedLines } from './untracked.js';
 
 export const DEFAULT_MAX_VALUE_LENGTH = 80;
@@ -90,7 +91,8 @@ const STATUS_RANK: Record<WorkflowComparison['status'], number> = {
 const WARNINGS_RANK = 1;
 
 function displayRank(comparison: WorkflowComparison): number {
-  if (comparison.status !== 'deleted-on-instance' && comparison.warnings.length > 0) {
+  const needsAttention = comparison.warnings.length > 0 || comparison.secrets.length > 0;
+  if (comparison.status !== 'deleted-on-instance' && needsAttention) {
     return WARNINGS_RANK;
   }
   return STATUS_RANK[comparison.status];
@@ -137,7 +139,10 @@ function detailView(
   const indent = (prefix: string) => (line: string) => `${prefix}${line}`;
 
   for (const comparison of ordered) {
-    const warnings = comparison.warnings.map((warning) => `    ${renderWarning(warning, c)}`);
+    const warnings = [
+      ...comparison.warnings.map((warning) => `    ${renderWarning(warning, c)}`),
+      ...comparison.secrets.map((secret) => `    ${renderSecret(secret, c)}`),
+    ];
     switch (comparison.status) {
       case 'unchanged':
       case 'untracked':
@@ -197,6 +202,12 @@ function detailView(
   return lines;
 }
 
+function renderSecret(secret: SecretFinding, c: Colors): string {
+  return c.yellow(
+    `⚠ "${secret.node.name}" › ${formatPath(secret.path)} looks like a hard-coded secret (${secret.label})`,
+  );
+}
+
 function renderWarning(warning: BrokenReference, c: Colors): string {
   const where = `"${warning.node.name}" › ${formatPath(warning.path)}`;
   return c.yellow(
@@ -222,10 +233,11 @@ function summaryView(
   const rows = listed.map((comparison) => {
     const label = fit(`${comparison.name} (${comparison.id})`, nameWidth);
     const active = (comparison.active ? 'active' : '').padEnd(6);
-    const warnings =
-      comparison.warnings.length > 0
-        ? `  ${c.yellow(`⚠ ${plural(comparison.warnings.length, 'broken reference')}`)}`
-        : '';
+    const flags = [
+      comparison.warnings.length > 0 ? plural(comparison.warnings.length, 'broken reference') : '',
+      comparison.secrets.length > 0 ? plural(comparison.secrets.length, 'possible secret') : '',
+    ].filter(Boolean);
+    const warnings = flags.length > 0 ? `  ${c.yellow(`⚠ ${flags.join(', ')}`)}` : '';
     switch (comparison.status) {
       case 'only-after':
         return `${c.green('+')} ${label}  ${active}  ${c.dim(`only in ${options.afterLabel}`)}${warnings}`;
@@ -325,6 +337,7 @@ function summaryLine(comparisons: WorkflowComparison[], options: TextRenderOptio
     (sum, comparison) => sum + comparison.warnings.length,
     0,
   );
+  const secrets = comparisons.reduce((sum, comparison) => sum + comparison.secrets.length, 0);
 
   const parts = [
     changed.length > 0
@@ -336,6 +349,7 @@ function summaryLine(comparisons: WorkflowComparison[], options: TextRenderOptio
     optional(count('deleted-on-instance'), 'deleted on instance'),
     possibleDefaults > 0 ? plural(possibleDefaults, 'possible default') : '',
     brokenReferences > 0 ? plural(brokenReferences, 'broken reference') : '',
+    secrets > 0 ? plural(secrets, 'possible secret') : '',
   ].filter(Boolean);
   return hasDifferences(comparisons) ? `${parts.join(', ')}.` : `No changes (${parts[1] ?? ''}).`;
 }
@@ -355,6 +369,14 @@ function hints(comparisons: WorkflowComparison[], c: Colors): string[] {
       c.yellow(
         'Broken references: expressions or Code nodes refer to node names that do not exist, often after a ' +
           'rename. These nodes will fail when they run.',
+      ),
+    );
+  }
+  if (comparisons.some((comparison) => comparison.secrets.length > 0)) {
+    lines.push(
+      c.yellow(
+        'Possible secrets: values that look like hard-coded credentials; use n8n credentials instead. ' +
+          'Values are redacted in this output (--show-secrets shows them). The check is heuristic and can miss secrets.',
       ),
     );
   }

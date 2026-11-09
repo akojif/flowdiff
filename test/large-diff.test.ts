@@ -127,6 +127,7 @@ describe('display order', () => {
           reference: 'Gone',
         },
       ],
+      secrets: [],
     };
     const changed: WorkflowComparison = {
       id: 'c',
@@ -135,6 +136,7 @@ describe('display order', () => {
       active: false,
       changes: [],
       warnings: [],
+      secrets: [],
     };
     expect(orderForDisplay([changed, brokenNew]).map((c) => c.id)).toEqual(['n', 'c']);
   });
@@ -155,8 +157,24 @@ describe('display order', () => {
 
   it('breaks ties by name', () => {
     const ties = [
-      { id: 'b', name: 'Beta', status: 'changed', active: false, changes: [], warnings: [] },
-      { id: 'a', name: 'Alpha', status: 'changed', active: false, changes: [], warnings: [] },
+      {
+        id: 'b',
+        name: 'Beta',
+        status: 'changed',
+        active: false,
+        changes: [],
+        warnings: [],
+        secrets: [],
+      },
+      {
+        id: 'a',
+        name: 'Alpha',
+        status: 'changed',
+        active: false,
+        changes: [],
+        warnings: [],
+        secrets: [],
+      },
     ] satisfies WorkflowComparison[];
     expect(orderForDisplay(ties).map((c) => c.name)).toEqual(['Alpha', 'Beta']);
   });
@@ -177,6 +195,7 @@ describe('summary view', () => {
         active: false,
         changes: [],
         warnings: [],
+        secrets: [],
       },
     ];
     const line = renderText(long, { ...options, view: 'summary', width: 80 }).split('\n')[2] ?? '';

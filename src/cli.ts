@@ -54,6 +54,7 @@ program
   .option('--stat', 'one summary line per workflow (default when more than 5 changed)')
   .option('--no-stat', 'always show every change')
   .option('--json', 'machine-readable output (never truncated)')
+  .option('--show-secrets', 'show values that look like secrets instead of redacting them')
   .option('--include-layout', 'also show node position changes')
   .option('--full', 'show long values in full instead of truncating them')
   .option('--exit-code', 'exit with 1 if there are changes (for CI)')
@@ -76,6 +77,7 @@ program
   .option('--dry-run', 'show what would be pushed and change nothing')
   .option('--force', 'overwrite even if the workflow changed on the instance since the last pull')
   .option('--apply-active', 'also switch workflows on/off to match the local files')
+  .option('--show-secrets', 'show values that look like secrets instead of redacting them')
   .option('--tag <name>', 'only consider workflows with this tag (overrides the saved tag)')
   .option('--no-tag', 'ignore the tag saved in flowdiff.config.json for this run')
   .action(async (workflow: string | undefined, flags: PushFlags) => {

@@ -8,6 +8,7 @@ import { resolveConnection } from '../config/connection.js';
 import { loadDotEnv, readEnv } from '../config/env.js';
 import { describeTagScope, resolveTagScope } from '../config/tag-scope.js';
 import { normalizeWorkflow, serializeWorkflow, unknownTopLevelFields } from '../normalize/index.js';
+import { scanWorkflowSecrets } from '../secrets/scan.js';
 import { indexWorkflowFiles, workflowFileName } from '../workspace/paths.js';
 import { hashContent, readState, writeState } from '../workspace/state.js';
 
@@ -39,6 +40,8 @@ export interface PullResult {
   duplicateFiles: string[];
   /** Top-level fields not on flowdiff's known list, across all pulled workflows. Kept on disk. */
   unknownFields: string[];
+  /** Pulled files with possible hard-coded secrets, and what was found. */
+  secrets: { file: string; labels: string[] }[];
 }
 
 export interface PullOptions {
@@ -73,6 +76,7 @@ export async function pull(options: PullOptions): Promise<PullResult> {
   const entries: PullEntry[] = [];
   const duplicateFiles: string[] = [];
   const unknownFields = new Set<string>();
+  const secrets: PullResult['secrets'] = [];
 
   for (const workflow of workflows) {
     const content = serializeWorkflow(normalizeWorkflow(workflow));
@@ -119,6 +123,8 @@ export async function pull(options: PullOptions): Promise<PullResult> {
 
     const file = writes ? targetFile : (currentFile ?? targetFile);
     entries.push({ id: workflow.id, name: workflow.name, file, outcome });
+    const found = scanWorkflowSecrets(normalizeWorkflow(workflow));
+    if (found.length > 0) secrets.push({ file, labels: found.map((f) => f.label) });
   }
 
   // With a tag filter, a missing workflow may simply be untagged, so only check on a full pull.
@@ -129,7 +135,13 @@ export async function pull(options: PullOptions): Promise<PullResult> {
       : [];
 
   await writeState(cwd, state);
-  return { entries, missingOnInstance, duplicateFiles, unknownFields: [...unknownFields].sort() };
+  return {
+    entries,
+    missingOnInstance,
+    duplicateFiles,
+    unknownFields: [...unknownFields].sort(),
+    secrets,
+  };
 }
 
 const OUTCOME_LABELS: Record<PullOutcome, string> = {
@@ -177,6 +189,16 @@ export function formatPullResult(result: PullResult, workflowsDir: string): stri
     lines.push(
       pc.yellow(`${join(workflowsDir, file)} is a duplicate file for the same workflow id.`),
     );
+  }
+  if (result.secrets.length > 0) {
+    lines.push(
+      pc.yellow(
+        `Possible hard-coded secrets in ${String(result.secrets.length)} pulled file(s); check before committing:`,
+      ),
+    );
+    for (const { file, labels } of result.secrets) {
+      lines.push(pc.yellow(`  ⚠ ${join(workflowsDir, file)}: ${[...new Set(labels)].join(', ')}`));
+    }
   }
   if (result.unknownFields.length > 0) {
     lines.push(

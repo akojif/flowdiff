@@ -17,6 +17,8 @@ import { loadInstanceScope } from './instance-scope.js';
 
 export interface PushFlags {
   dryRun?: boolean;
+  /** Show secret values in the diff (never affects what is sent). */
+  showSecrets?: boolean;
   force?: boolean;
   applyActive?: boolean;
   tag?: string | false;
@@ -83,6 +85,7 @@ export async function pushCommand(
     selected,
     force,
     applyActive: flags.applyActive === true,
+    showSecrets: flags.showSecrets === true,
     guard,
   });
   let planned = decisions.filter((d): d is PlannedPush => d.action === 'push');
@@ -112,6 +115,11 @@ export async function pushCommand(
       const notes = [
         ...plan.dropped.map((d) => `not sent (n8n would reject it): ${d}`),
         ...plan.credentialWarnings,
+        ...(plan.comparison.secrets.length > 0 && !plan.changesSecret
+          ? [
+              `${String(plan.comparison.secrets.length)} possible secret(s) already in this workflow (unchanged by this push)`,
+            ]
+          : []),
         ...plan.notes,
         ...(plan.activeChange === undefined ? [] : [`will ${plan.activeChange} the workflow`]),
       ];
@@ -145,10 +153,21 @@ export async function pushCommand(
     return { exitCode: 1, results: [] };
   }
 
-  // Broken references make nodes fail at run time: confirm each one separately (default: no).
+  // Broken references make nodes fail at run time, and adding or changing a
+  // hard-coded secret deserves a second look: confirm each separately (default: no).
   let declined = false;
   const confirmed: PlannedPush[] = [];
   for (const plan of planned) {
+    if (plan.changesSecret) {
+      const ok = await io.confirm(
+        `"${plan.name}" adds or changes a possible hard-coded secret. Push it anyway?`,
+      );
+      if (!ok) {
+        declined = true;
+        io.log(c.dim(`skipped  ${plan.name} (${plan.id}): possible secret`));
+        continue;
+      }
+    }
     if (plan.brokenReferences.length > 0) {
       const ok = await io.confirm(
         `"${plan.name}" has ${String(plan.brokenReferences.length)} broken reference(s). Push it anyway?`,

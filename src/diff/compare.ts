@@ -1,4 +1,5 @@
 import type { NormalizedWorkflow } from '../normalize/normalize.js';
+import { redactWorkflow, scanWorkflowSecrets, type SecretFinding } from '../secrets/scan.js';
 import { diffWorkflows, type DiffOptions } from './diff-workflows.js';
 import { findBrokenReferences, type BrokenReference } from './references.js';
 import type { Change } from './types.js';
@@ -26,6 +27,8 @@ export interface WorkflowComparison {
    * on the after side, i.e. what push would send. Empty otherwise.
    */
   warnings: BrokenReference[];
+  /** Possible hard-coded secrets in the same after-side version (see `warnings`). */
+  secrets: SecretFinding[];
 }
 
 export interface CompareOptions extends DiffOptions {
@@ -34,6 +37,11 @@ export interface CompareOptions extends DiffOptions {
    * workflow actually runs), the later ref for git ranges. Default: after.
    */
   activeSide?: 'before' | 'after';
+  /**
+   * Show secret values in changes. Default false: both sides are redacted before
+   * diffing, so no renderer can print a secret by accident.
+   */
+  showSecrets?: boolean;
 }
 
 /**
@@ -48,18 +56,23 @@ export function compareWorkflowSets(
   const activeOf = (b: NormalizedWorkflow | undefined, a: NormalizedWorkflow | undefined) =>
     (options.activeSide === 'before' ? (b ?? a) : (a ?? b))?.active ?? false;
 
+  const forDiff = (workflow: NormalizedWorkflow) =>
+    options.showSecrets === true ? workflow : redactWorkflow(workflow);
+
   const comparisons: WorkflowComparison[] = [];
   for (const [id, a] of after) {
     const b = before.get(id);
-    const changes = b === undefined ? [] : diffWorkflows(b, a, options);
+    const changes = b === undefined ? [] : diffWorkflows(forDiff(b), forDiff(a), options);
     const status = b === undefined ? 'only-after' : changes.length > 0 ? 'changed' : 'unchanged';
+    const checked = status !== 'unchanged';
     comparisons.push({
       id,
       name: a.name,
       status,
       active: activeOf(b, a),
       changes,
-      warnings: status === 'unchanged' ? [] : findBrokenReferences(a),
+      warnings: checked ? findBrokenReferences(a) : [],
+      secrets: checked ? scanWorkflowSecrets(a) : [],
     });
   }
   for (const [id, b] of before) {
@@ -71,6 +84,7 @@ export function compareWorkflowSets(
       active: activeOf(b, undefined),
       changes: [],
       warnings: [],
+      secrets: [],
     });
   }
   return comparisons.sort((x, y) => compare(x.name, y.name) || compare(x.id, y.id));
