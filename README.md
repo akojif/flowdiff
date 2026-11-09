@@ -1,5 +1,6 @@
 # flowdiff
 
+[![npm](https://img.shields.io/npm/v/@akojif/flowdiff)](https://www.npmjs.com/package/@akojif/flowdiff)
 [![CI](https://github.com/akojif/flowdiff/actions/workflows/ci.yml/badge.svg)](https://github.com/akojif/flowdiff/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -8,6 +9,9 @@
 flowdiff pulls your n8n workflows into git as clean JSON files, shows what changed in terms of nodes, parameters and connections instead of raw JSON, and pushes your changes back to n8n with safety checks. It uses the n8n public API, so it works with any n8n instance (Community, self-hosted or Cloud) without server access.
 
 ![flowdiff diff in a terminal](docs/demo.gif)
+
+<details>
+<summary>The same output as text</summary>
 
 ```text
 $ flowdiff diff main..feature
@@ -45,15 +49,15 @@ Broken references: these expressions name nodes that don't exist, so those nodes
 Possible secrets are redacted (--show-secrets shows them); use n8n credentials and rotate any real key.
 ```
 
-The demo uses made-up workflows; `node scripts/demo-repo.mjs <dir>` recreates it.
+</details>
+
+The demo uses made-up workflows (`node scripts/demo-repo.mjs <dir>` recreates it), so no n8n instance is needed.
 
 ## Why
 
-An n8n workflow is one large JSON document. Diff two versions with git and you mostly see noise: timestamps, version ids, reordered keys and moved nodes, with the real change buried somewhere in a 2,000-line file.
+Diff two versions of an n8n workflow with git and you mostly see noise: timestamps, version ids, reordered keys and moved nodes. flowdiff normalizes the files so pulling twice never creates a change, then shows what actually changed: renames as renames, IF branches as `true`/`false`, line-by-line Code and prompt diffs, each change marked **behavior** or **cosmetic**, plus warnings for broken node references and pasted tokens.
 
-flowdiff normalizes workflows so pulling twice never creates a git change, and diffs them the way you think about them: a renamed node is a rename, a rewired IF branch says `true`/`false`, Code nodes and AI prompts get line-by-line diffs, and every change is marked as **behavior** or **cosmetic**. It also flags expressions that point at renamed nodes and tokens pasted into parameters.
-
-It's built for teams who want Git-based review and CI checks for their workflows. On n8n Enterprise, the built-in Git source control may already cover your needs; flowdiff works with any edition via the public API and focuses on readable review and CI checks.
+On n8n Enterprise, the built-in Git source control may already cover your needs; flowdiff works with any edition via the public API and focuses on readable review and CI checks.
 
 ## Quick start
 
@@ -121,46 +125,17 @@ Why each of these exists, and the n8n API behaviour behind them: [docs/how-it-wo
 
 ## GitHub Action
 
-> **Coming in a later release.** The Action isn't part of 0.1.0 yet.
-
-Comment on pull requests with a readable diff of the workflow files they change, and optionally fail the check on behavior changes. It works from git alone: no n8n instance or API key.
-
-```yaml
-on:
-  pull_request:
-    paths: ['workflows/**']
-
-permissions:
-  contents: read
-  pull-requests: write
-
-concurrency:
-  group: flowdiff-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
-jobs:
-  diff:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      - uses: akojif/flowdiff@v0
-        with:
-          fail-on: behavior # or: none, changes
-```
-
-The Action keeps one comment up to date, stays within GitHub's comment size limit (the full report goes to the job summary), and always redacts secrets. On pull requests from forks, GitHub doesn't allow the comment, so the report appears in the job summary instead. Details: [docs/github-action.md](docs/github-action.md).
+**Coming soon:** a GitHub Action that comments on pull requests with this diff (from git alone, no n8n instance or API key) and can fail the check on behavior changes. Planned design and example workflow: [docs/github-action.md](docs/github-action.md).
 
 ## Limitations
 
-- **The secret scanner is heuristic.** It catches common token formats and obvious patterns, not every secret. A clean result means "no known pattern found".
-- **No workflow creation.** Push only updates workflows that already exist in n8n.
-- **Tags and activation aren't pushed** by default. Tag changes are reported, not sent; activation needs `--apply-active`.
-- **Possible-default noise.** The n8n editor removes parameters equal to their defaults when saving, so a workflow created through the API can show "possible defaults" after its first save. They're listed separately; pull again to refresh your baseline.
-- **Workflow descriptions aren't synced.** The API's workflow list doesn't include them, and push leaves them untouched.
-- **Missing-credential warnings** need the `credential:list` scope on the push key; without it, that check is skipped.
-- **Tested against n8n 2.46.x.** n8n validates update requests strictly, so newer versions that add fields may need an update to flowdiff's allow-lists (push reports anything it had to drop).
+- **The secret scanner is heuristic**: a clean result means "no known pattern found", not "no secrets".
+- **Push only updates** existing workflows: no creating, recreating or deleting.
+- **Tags aren't pushed**, and activation only changes with `--apply-active`.
+- **Possible defaults** can appear after the n8n editor's first save of an API-created workflow; pull again to refresh.
+- **Workflow descriptions aren't synced** (the API's workflow list doesn't include them).
+- **The missing-credential warning** needs the `credential:list` scope on the push key.
+- **Tested against n8n 2.46.x**; push reports any field a newer n8n version adds that it had to drop.
 
 ## How I built this
 

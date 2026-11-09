@@ -1,6 +1,6 @@
 # GitHub Action
 
-> **Coming in a later release.** The Action isn't part of flowdiff 0.1.0 yet. This page describes how it will work.
+> **Coming soon.** The Action isn't released yet. This page describes how it will work.
 
 The Action comments on pull requests with a readable diff of the n8n workflow files they change. It uses git only: no n8n instance and no API key.
 
