@@ -29,9 +29,17 @@ export interface FakeClientOptions {
 }
 
 /**
+ * Fields the real single-workflow GET returns but the list endpoint leaves out
+ * (checked against n8n 2.46). Mimicking this keeps tests honest about which
+ * endpoint a hash came from.
+ */
+const SINGLE_GET_ONLY_FIELDS = ['description', 'sourceWorkflowId', 'versionCounter'] as const;
+
+/**
  * An in-memory stand-in for the n8n API. Mutate `workflows` to simulate instance
- * edits; `calls` records every request in order. Updates behave like n8n:
- * only sent fields change, and pinData/staticData are kept.
+ * edits; `calls` records every request in order. Like n8n: the list endpoint
+ * omits pin data and the single-GET-only fields, the single GET adds them, and
+ * updates only change the fields that were sent (pinData/staticData are kept).
  */
 export function fakeClient(workflows: ApiWorkflow[], options: FakeClientOptions = {}) {
   const calls: FakeCall[] = [];
@@ -46,15 +54,30 @@ export function fakeClient(workflows: ApiWorkflow[], options: FakeClientOptions 
     calls,
     credentials: options.credentials ?? [],
     listWorkflows({ tag }: { tag?: string } = {}): Promise<ApiWorkflow[]> {
-      calls.push({ method: 'list' });
-      const all = structuredClone(client.workflows);
+      calls.push({ method: 'list', query: tag === undefined ? {} : { tag } });
+      const omitted = new Set<string>([...SINGLE_GET_ONLY_FIELDS, 'pinData']);
+      const all = structuredClone(client.workflows).map(
+        (workflow) =>
+          Object.fromEntries(
+            Object.entries(workflow).filter(([key]) => !omitted.has(key)),
+          ) as ApiWorkflow,
+      );
       return Promise.resolve(
         tag === undefined ? all : all.filter((w) => w.tags?.some((t) => t.name === tag)),
       );
     },
     getWorkflow(id: string, opts: { includePinData?: boolean } = {}): Promise<ApiWorkflow> {
       calls.push({ method: 'get', id, query: { includePinData: opts.includePinData ?? false } });
-      return Promise.resolve().then(() => structuredClone(find(id)));
+      return Promise.resolve().then(() => {
+        const workflow: Record<string, unknown> = {
+          description: '',
+          sourceWorkflowId: null,
+          versionCounter: version + 1,
+          ...structuredClone(find(id)),
+        };
+        if (opts.includePinData !== true) delete workflow.pinData;
+        return workflow as ApiWorkflow;
+      });
     },
     updateWorkflow(id: string, body: WorkflowUpdateBody): Promise<void> {
       calls.push({ method: 'update', id, body: structuredClone(body) });

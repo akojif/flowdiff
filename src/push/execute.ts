@@ -1,6 +1,7 @@
 import { readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { N8nClient } from '../api/client.js';
+import type { ApiWorkflow } from '../api/schemas.js';
 import type { Config } from '../config/config-file.js';
 import { normalizeWorkflow } from '../normalize/normalize.js';
 import { serializeWorkflow } from '../normalize/serialize.js';
@@ -44,6 +45,29 @@ export async function executePush(
   return results;
 }
 
+/**
+ * The workflow as the list endpoint returns it, or undefined if it isn't in the
+ * list filtered by the dev-guard tag.
+ *
+ * Every hash flowdiff compares must come from the same endpoint: the single GET
+ * (GET /workflows/{id}) returns extra fields such as `description` and
+ * `sourceWorkflowId` that the list (used by pull and status) leaves out, so
+ * hashes from the two never match. Filtering by tag keeps this fast on large
+ * instances; while the dev guard exists, a pushable workflow always has the tag.
+ */
+export async function listedVersion(
+  client: N8nClient,
+  id: string,
+): Promise<ApiWorkflow | undefined> {
+  const listed = await client.listWorkflows({ tag: DEV_GUARD_TAG });
+  return listed.find((workflow) => workflow.id === id && workflow.isArchived !== true);
+}
+
+/** The content hash pull records and status compares against. */
+export function comparableHash(workflow: ApiWorkflow): string {
+  return hashContent(serializeWorkflow(normalizeWorkflow(workflow)));
+}
+
 async function pushOne(plan: PlannedPush, options: ExecuteOptions): Promise<PushResult> {
   const { cwd, config, client, force, now } = options;
   const result = (
@@ -59,29 +83,39 @@ async function pushOne(plan: PlannedPush, options: ExecuteOptions): Promise<Push
   });
 
   // 1. Re-check against a fresh copy: the instance may have changed since planning.
-  let fresh;
+  //    It must be list-shaped, like the copy pull hashed (see listedVersion).
+  let listed;
   try {
-    fresh = await client.getWorkflow(plan.id, { includePinData: true });
+    listed = await listedVersion(client, plan.id);
   } catch (error) {
     return result('failed', `could not read the instance version: ${(error as Error).message}`);
   }
-  if (!(fresh.tags ?? []).some((tag) => tag.name === DEV_GUARD_TAG)) {
+  if (listed === undefined) {
     return result(
       'refused',
-      `dev guard: the instance version no longer has the "${DEV_GUARD_TAG}" tag`,
+      `dev guard: the instance version no longer has the "${DEV_GUARD_TAG}" tag (or was deleted)`,
     );
   }
   const state = await readState(cwd);
-  const freshHash = hashContent(serializeWorkflow(normalizeWorkflow(fresh)));
-  if (!force && freshHash !== state.workflows[plan.id]?.hash) {
+  if (!force && comparableHash(listed) !== state.workflows[plan.id]?.hash) {
     return result(
       'refused',
       'changed on the instance since the last pull; run flowdiff pull, or use --force',
     );
   }
 
-  // 2. Back up before writing anything.
-  const backup = await writeBackup(cwd, plan.id, fresh, now());
+  // 2. Back up before writing anything: the full single-workflow response, with pin data.
+  let backup;
+  try {
+    backup = await writeBackup(
+      cwd,
+      plan.id,
+      await client.getWorkflow(plan.id, { includePinData: true }),
+      now(),
+    );
+  } catch (error) {
+    return result('failed', `could not back up the instance version: ${(error as Error).message}`);
+  }
 
   // 3. Update, then activation only if it was explicitly requested.
   try {
@@ -106,7 +140,8 @@ async function pushOne(plan: PlannedPush, options: ExecuteOptions): Promise<Push
   // 4. Refresh the local file and pull record from what the instance now stores.
   let stored;
   try {
-    stored = await client.getWorkflow(plan.id);
+    stored = await listedVersion(client, plan.id);
+    if (stored === undefined) throw new Error('it no longer appears in the tagged workflow list');
   } catch (error) {
     return result(
       'pushed',

@@ -8,6 +8,7 @@ import { pushCommand, type PushFlags } from '../src/commands/push.js';
 import { statusCommand } from '../src/commands/status.js';
 import { writeConfig, type Config } from '../src/config/config-file.js';
 import { normalizeWorkflow } from '../src/normalize/normalize.js';
+import { comparableHash, listedVersion } from '../src/push/execute.js';
 import { buildUpdateBody } from '../src/push/request-body.js';
 import { fakeClient, loadAllFixtures, loadFixture } from './helpers.js';
 
@@ -143,14 +144,17 @@ describe('push happy path', () => {
       'url: "https://api.example.com/items" → "https://api.example.com/v2/items"',
     );
     expect(prompts).toEqual(['Push 1 workflow to https://n8n.example.com?']);
+    // list (plan), list filtered by tag (pre-write check), get with pin data (backup), update, list (refresh)
     expect(client.calls.map((c) => c.method)).toEqual([
       'list',
       'listCredentials',
+      'list',
       'get',
       'update',
-      'get',
+      'list',
     ]);
-    expect(client.calls[2]?.query).toEqual({ includePinData: true });
+    expect(client.calls[2]?.query).toEqual({ tag: 'flowdiff-test' });
+    expect(client.calls[3]?.query).toEqual({ includePinData: true });
   });
 
   it('writes the backup before updating, with the full instance version', async () => {
@@ -161,7 +165,13 @@ describe('push happy path', () => {
     expect(backup).toBe(
       join('.flowdiff', 'backups', 'fixtureLinear001', '2027-02-03T04-05-06-789Z.json'),
     );
-    expect(JSON.parse(await readFile(join(cwd, backup), 'utf8'))).toEqual(before);
+    // The single GET's full shape: everything stored, plus fields the list leaves out.
+    expect(JSON.parse(await readFile(join(cwd, backup), 'utf8'))).toEqual({
+      ...before,
+      description: '',
+      sourceWorkflowId: null,
+      versionCounter: expect.any(Number) as unknown,
+    });
   });
 
   it('sends exactly the writable fields', async () => {
@@ -345,10 +355,11 @@ describe('active, tags and credentials', () => {
     expect(client.calls.map((c) => c.method)).toEqual([
       'list',
       'listCredentials',
+      'list',
       'get',
       'update',
       'activate',
-      'get',
+      'list',
     ]);
     expect(instance('fixtureLinear001').active).toBe(true);
   });
@@ -411,5 +422,47 @@ describe('backups folder', () => {
       io: { interactive: true, confirm: () => Promise.resolve(true), log: () => undefined },
     });
     expect(await readdir(join(cwd, '.flowdiff', 'backups', 'fixtureLinear001'))).toHaveLength(2);
+  });
+});
+
+// Regression: status and push's pre-write check once hashed different endpoints
+// (list vs single GET, which adds description/sourceWorkflowId), so push refused
+// every workflow with "changed on the instance" although nobody had edited it.
+describe('status and push agree on the instance version', () => {
+  it('pushes a workflow that status reports as modified locally', async () => {
+    await editLocal(LINEAR, setUrl('https://api.example.com/v2/items'));
+
+    const { statuses } = await statusCommand({ cwd, config, client, flags: {}, color: false });
+    expect(statuses.find((s) => s.id === 'fixtureLinear001')?.status).toBe('modified-locally');
+
+    const { results, output } = await run();
+    expect(output).not.toContain('changed on the instance');
+    expect(results).toMatchObject([{ id: 'fixtureLinear001', outcome: 'pushed' }]);
+  });
+
+  it('computes the same hash as pull and status from the same API responses', async () => {
+    const recorded = JSON.parse(await readFile(join(cwd, '.flowdiff', 'state.json'), 'utf8')) as {
+      workflows: Record<string, { hash: string }>;
+    };
+    const listed = await listedVersion(client, 'fixtureLinear001');
+    if (listed === undefined) throw new Error('not listed');
+
+    expect(comparableHash(listed)).toBe(recorded.workflows.fixtureLinear001?.hash);
+    // The trap this guards against: the single GET's shape hashes differently.
+    expect(comparableHash(await client.getWorkflow('fixtureLinear001'))).not.toBe(
+      recorded.workflows.fixtureLinear001?.hash,
+    );
+  });
+
+  it('leaves nothing for a pull to change after a push', async () => {
+    await editLocal(LINEAR, setUrl('https://api.example.com/v2/items'));
+    await run();
+    const afterPush = await readFile(join(cwd, LINEAR), 'utf8');
+
+    const result = await pull({ cwd, config, client });
+
+    expect(result.entries.find((e) => e.id === 'fixtureLinear001')?.outcome).toBe('unchanged');
+    expect(await readFile(join(cwd, LINEAR), 'utf8')).toBe(afterPush);
+    expect(afterPush).not.toContain('sourceWorkflowId');
   });
 });

@@ -193,24 +193,24 @@ describe('formatPullResult', () => {
 
 describe('unknown top-level fields', () => {
   it('collects them across workflows and still writes them to disk', async () => {
-    Object.assign(instanceWorkflow('fixtureLinear001'), { description: 'x', folderId: 'f1' });
-    Object.assign(instanceWorkflow('fixtureIfBranch1'), { description: 'y' });
+    Object.assign(instanceWorkflow('fixtureLinear001'), { customField: 'x', folderId: 'f1' });
+    Object.assign(instanceWorkflow('fixtureIfBranch1'), { customField: 'y' });
 
     const result = await pull({ cwd, config, client });
 
-    expect(result.unknownFields).toEqual(['description', 'folderId']);
+    expect(result.unknownFields).toEqual(['customField', 'folderId']);
     const content = await readFile(workflowPath('fixture-linear.fixtureLinear001.json'), 'utf8');
-    expect(content).toContain('"description": "x"');
+    expect(content).toContain('"customField": "x"');
   });
 
   it('prints a one-line notice naming them', async () => {
-    Object.assign(instanceWorkflow('fixtureLinear001'), { description: 'x' });
+    Object.assign(instanceWorkflow('fixtureLinear001'), { customField: 'x' });
 
     const text = formatPullResult(await pull({ cwd, config, client }), 'workflows');
     const notices = text.split('\n').filter((line) => line.includes('Notice:'));
 
     expect(notices).toHaveLength(1);
-    expect(notices[0]).toContain('unrecognized top-level field(s): description.');
+    expect(notices[0]).toContain('unrecognized top-level field(s): customField.');
   });
 
   it('prints no notice when every field is known', async () => {
