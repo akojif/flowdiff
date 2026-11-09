@@ -47,11 +47,12 @@ runs:
     - id: flowdiff
       shell: bash
       run: npx --yes @akojif/flowdiff@0.1.2 github-action
-      # Same input names a JavaScript action would get (what flowdiff 0.1.1+ reads).
+      # Underscores, not hyphens: this step runs through bash, which drops environment
+      # variables whose names aren't valid shell identifiers (e.g. INPUT_FAIL-ON).
       env:
-        INPUT_FAIL-ON: ${{ inputs.fail-on }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
         INPUT_COMMENT: ${{ inputs.comment }}
-        INPUT_WORKING-DIRECTORY: ${{ inputs.working-directory }}
+        INPUT_WORKING_DIRECTORY: ${{ inputs.working-directory }}
         INPUT_TOKEN: ${{ inputs.token }}
         # Don't run any dependency install scripts while fetching the package.
         npm_config_ignore_scripts: 'true'
