@@ -1,8 +1,8 @@
 # GitHub Action
 
-> **Coming soon.** The Action isn't released yet. This page describes how it will work.
-
 The Action comments on pull requests with a readable diff of the n8n workflow files they change. It uses git only: no n8n instance and no API key.
+
+See it on the [demo pull request](https://github.com/akojif/flowdiff-demo/pull/3) in [akojif/flowdiff-demo](https://github.com/akojif/flowdiff-demo). Its check is red on purpose: the demo uses `fail-on: behavior`, and the pull request changes behavior.
 
 ## Example workflow
 
@@ -34,6 +34,8 @@ jobs:
         with:
           fail-on: behavior
 ```
+
+`@v0` follows the latest 0.x release. For maximum supply-chain safety, pin a full commit SHA instead (`akojif/flowdiff@<40-character SHA>`; GitHub doesn't accept short SHAs). The Action sets up Node.js 24 for the rest of the job and runs the matching published version of `@akojif/flowdiff` with `npx`.
 
 ## Inputs
 

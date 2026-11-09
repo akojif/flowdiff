@@ -97,13 +97,13 @@ Verified against n8n 2.46 source and live (2026-11-09):
    - status and push use the same tag scope as diff (`resolveTagScope`).
    - push must refuse, or ask for explicit confirmation, when the workflows being pushed have broken-reference warnings.
 4. Polish: GitHub Action posting diffs as PR comments, hard-coded-secret scanner, README with `vhs` demo, npm publish
-   - Order: Markdown renderer + Action logic (done) → README + docs/ (done; `docs/demo.gif` from `vhs docs/demo.tape`, built on `scripts/demo-repo.mjs`) → npm release 0.1.0 (prepared; see Releasing) → composite `action.yml` running `npx @akojif/flowdiff@<exact version> github-action`, with `actions/setup-node` pinning Node → demo repo `akojif/flowdiff-demo` (ask first). README example workflow uses minimal permissions and a `concurrency` group.
+   - Order (all done as of 0.1.2): Markdown renderer + Action logic → README + docs/ (`docs/demo.gif` from `vhs docs/demo.tape`, built on `scripts/demo-repo.mjs`) → npm releases → composite `action.yml` running `npx @akojif/flowdiff@<exact version> github-action` with `actions/setup-node` (Node 24) → demo repo `akojif/flowdiff-demo` (sample PR #3, `fail-on: behavior`, red check on purpose; tested end to end via `@v0`). README example workflow uses minimal permissions, a `concurrency` group and `fetch-depth: 0`.
    - `--exit-code [changes|behavior]` is done (`shouldFail`): behavior = behavior changes, broken references, or added/removed workflows.
    - The GitHub Action must redact values the secret scanner flags before posting diffs as PR comments. It must NEVER allow `--show-secrets` (no input, no passthrough).
 
 ## Releasing
 
-- Versions are managed with changesets: each behaviour change adds one (`npx changeset`). To release: `npx changeset version`, commit, `git tag -a vX.Y.Z`, push the commit and the tag.
+- Versions are managed with changesets: each behaviour change adds one (`npx changeset`). To release: `npm run version-packages` (changeset version + re-pins `action.yml` + lockfile), commit, `git tag -a vX.Y.Z`, push the commit and the tag. After the approved publish, `release.yml` moves `v0` to the release.
 - `.github/workflows/release.yml` publishes on `v*` tags via npm trusted publishing (OIDC, no token; provenance is automatic). It runs in the `npm` GitHub environment (required reviewer, `v*` tags only), checks the tag matches `package.json`, skips versions already on npm, and `prepublishOnly` runs lint, typecheck, tests and build.
 - The npm trusted publisher must name owner `akojif`, repository `flowdiff`, workflow `release.yml`, environment `npm`; `repository.url` in package.json must match the repo exactly. A new trusted publisher configuration expires if it isn't used for a successful publish within 2 days. Trusted publishing needs npm >= 11.5.1 in CI (the workflow installs npm@11).
 - The npm package is `@akojif/flowdiff` (npm rejected the unscoped name as too similar to `flow-diff`); the command is still `flowdiff`. `publishConfig.access` is `public`, because scoped packages are private by default.

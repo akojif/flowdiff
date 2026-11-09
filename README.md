@@ -125,7 +125,37 @@ Why each of these exists, and the n8n API behaviour behind them: [docs/how-it-wo
 
 ## GitHub Action
 
-**Coming soon:** a GitHub Action that comments on pull requests with this diff (from git alone, no n8n instance or API key) and can fail the check on behavior changes. Planned design and example workflow: [docs/github-action.md](docs/github-action.md).
+Comment on pull requests with a readable diff of the workflow files they change, and optionally fail the check on behavior changes. It works from git alone: no n8n instance or API key. See it on the [demo pull request](https://github.com/akojif/flowdiff-demo/pull/3), whose check is red on purpose.
+
+```yaml
+# .github/workflows/flowdiff.yml
+name: flowdiff
+
+on:
+  pull_request:
+    paths: ['workflows/**']
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: flowdiff-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: akojif/flowdiff@v0
+        with:
+          fail-on: behavior # or: none, changes
+```
+
+The Action keeps one comment up to date, writes the full report to the job summary, and always redacts secrets. On pull requests from forks, GitHub doesn't allow the comment, so the report appears in the job summary instead. Inputs, outputs and details: [docs/github-action.md](docs/github-action.md).
 
 ## Limitations
 
