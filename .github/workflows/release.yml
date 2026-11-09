@@ -28,12 +28,14 @@ jobs:
       id-token: write # lets npm verify this workflow instead of a token
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+          # No dependency cache in the publish job, as in npm's trusted publishing example.
+          package-manager-cache: false
 
       # Trusted publishing needs npm 11.5.1 or later.
       - run: npm install --global npm@11
