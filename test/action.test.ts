@@ -321,41 +321,49 @@ describe('runAction', () => {
     expect(github.comments[0]?.body).not.toContain('--show-secrets');
   });
 
-  it('keeps the comment under GitHub’s size limit and points to the full report', async () => {
-    git('init', '--quiet', '--initial-branch=main');
-    git('config', 'user.email', 'test@example.com');
-    git('config', 'user.name', 'flowdiff test');
-    await writeConfig(repo, { instanceUrl: 'https://n8n.example.com', workflowsDir: 'workflows' });
-    const fixture = generateLargeFixture();
-    // Multi-line text that differs between the branches gives every workflow a big
-    // line-level diff, so the details overflow the comment budget.
-    const padded = (w: NormalizedWorkflow, side: string) => {
-      const copy = structuredClone(w);
-      const filler = Array.from(
-        { length: 60 },
-        (_, i) => `${side} line ${String(i)} of ${w.id}`,
-      ).join('\n');
-      for (const n of copy.nodes) n.parameters = { ...n.parameters, filler };
-      return copy;
-    };
-    await writeWorkflows([...fixture.instance.values()].map((w) => padded(w, 'before')));
-    git('add', '--all');
-    git('commit', '--quiet', '-m', 'base');
-    git('switch', '--quiet', '-c', 'feature');
-    await writeWorkflows([...fixture.local.values()].map((w) => padded(w, 'after')));
-    git('add', '--all');
-    git('commit', '--quiet', '-m', 'feature');
+  // Builds two commits of 50 large workflows (~3s alone); allow for a busy machine.
+  it(
+    'keeps the comment under GitHub’s size limit and points to the full report',
+    { timeout: 30_000 },
+    async () => {
+      git('init', '--quiet', '--initial-branch=main');
+      git('config', 'user.email', 'test@example.com');
+      git('config', 'user.name', 'flowdiff test');
+      await writeConfig(repo, {
+        instanceUrl: 'https://n8n.example.com',
+        workflowsDir: 'workflows',
+      });
+      const fixture = generateLargeFixture();
+      // Multi-line text that differs between the branches gives every workflow a big
+      // line-level diff, so the details overflow the comment budget.
+      const padded = (w: NormalizedWorkflow, side: string) => {
+        const copy = structuredClone(w);
+        const filler = Array.from(
+          { length: 60 },
+          (_, i) => `${side} line ${String(i)} of ${w.id}`,
+        ).join('\n');
+        for (const n of copy.nodes) n.parameters = { ...n.parameters, filler };
+        return copy;
+      };
+      await writeWorkflows([...fixture.instance.values()].map((w) => padded(w, 'before')));
+      git('add', '--all');
+      git('commit', '--quiet', '-m', 'base');
+      git('switch', '--quiet', '-c', 'feature');
+      await writeWorkflows([...fixture.local.values()].map((w) => padded(w, 'after')));
+      git('add', '--all');
+      git('commit', '--quiet', '-m', 'feature');
 
-    const { github, summary } = await run(
-      await env({ base: git('rev-parse', 'main'), head: git('rev-parse', 'feature') }),
-    );
+      const { github, summary } = await run(
+        await env({ base: git('rev-parse', 'main'), head: git('rev-parse', 'feature') }),
+      );
 
-    const body = github.comments[0]?.body ?? '';
-    expect(body.length).toBeLessThanOrEqual(65_536);
-    expect(body).toContain('omitted (comment size limit)');
-    expect(body).toContain('[Full report](https://github.example.com/octo/demo/actions/runs/42)');
-    expect(summary.length).toBeGreaterThan(body.length);
-  });
+      const body = github.comments[0]?.body ?? '';
+      expect(body.length).toBeLessThanOrEqual(65_536);
+      expect(body).toContain('omitted (comment size limit)');
+      expect(body).toContain('[Full report](https://github.example.com/octo/demo/actions/runs/42)');
+      expect(summary.length).toBeGreaterThan(body.length);
+    },
+  );
 });
 
 describe('runAction refusals', () => {

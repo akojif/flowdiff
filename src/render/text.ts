@@ -18,7 +18,6 @@ import type { SecretFinding } from '../secrets/scan.js';
 import { untrackedLines } from './untracked.js';
 
 export const DEFAULT_MAX_VALUE_LENGTH = 80;
-const DEFAULT_WIDTH = 80;
 
 export interface TextRenderOptions {
   /** Names for the two sides, e.g. `instance` and `local`, or two git refs. */
@@ -32,7 +31,10 @@ export interface TextRenderOptions {
   maxValueLength?: number;
   /** `detail` lists every change; `summary` shows one line per workflow. Default: detail. */
   view?: 'detail' | 'summary';
-  /** Terminal width, used to fit workflow names in the summary view. */
+  /**
+   * Terminal width, used to fit workflow names in the summary view and to wrap
+   * hints. Leave it out when output isn't a terminal: nothing is then truncated.
+   */
   width?: number;
   /** Heading, e.g. "Changes push would make to the instance". Default: "before → after". */
   title?: string;
@@ -229,11 +231,13 @@ function summaryView(
   const listed = ordered.filter(isListed);
   if (listed.length === 0) return [];
 
-  const width = options.width ?? DEFAULT_WIDTH;
   const longest = Math.max(
     ...listed.map((comparison) => `${comparison.name} (${comparison.id})`.length),
   );
-  const nameWidth = Math.min(longest, Math.max(20, width - 56));
+  // Fit names to the terminal; with no width (output piped to a file or another
+  // program), never cut them, so nothing is lost for scripts and logs.
+  const nameWidth =
+    options.width === undefined ? longest : Math.min(longest, Math.max(20, options.width - 56));
 
   const rows = listed.map((comparison) => {
     const label = fit(`${comparison.name} (${comparison.id})`, nameWidth);

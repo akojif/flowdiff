@@ -202,6 +202,48 @@ describe('summary view', () => {
     expect(line).toContain('…');
     expect(line.length).toBeLessThanOrEqual(80);
   });
+
+  it('never cuts names when output is not a terminal (no width)', () => {
+    const piped: TextRenderOptions = {
+      beforeLabel: 'instance',
+      afterLabel: 'local',
+      color: false,
+      full: false,
+    };
+    const text = renderText(comparisonsOf(generateLargeFixture()), { ...piped, view: 'summary' });
+    expect(text).not.toContain('…');
+    expect(text).toContain('Shipment Alert 39 (largeFixture39)');
+  });
+
+  it('never cuts names in the diff command when no width is given (piped output)', async () => {
+    const fixture = generateLargeFixture();
+    const cwd = await mkdtemp(join(tmpdir(), 'flowdiff-piped-'));
+    const config: Config = { instanceUrl: 'https://n8n.example.com', workflowsDir: 'workflows' };
+    await writeConfig(cwd, config);
+    await mkdir(join(cwd, 'workflows'));
+    for (const workflow of fixture.local.values()) {
+      await writeFile(
+        join(cwd, 'workflows', workflowFileName(workflow)),
+        serializeWorkflow(workflow),
+      );
+    }
+    const toApi = (w: NormalizedWorkflow): ApiWorkflow => ({
+      ...w,
+      tags: w.tags.map((name) => ({ id: `tag-${name}`, name })),
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+    const client = fakeClient([...fixture.instance.values()].map(toApi));
+
+    const { output } = await diffCommand({
+      cwd,
+      config,
+      flags: { stat: true },
+      getClient: () => client,
+      color: false,
+    });
+
+    expect(output).not.toContain('…');
+  });
 });
 
 describe('detail view', () => {
