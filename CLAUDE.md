@@ -97,9 +97,17 @@ Verified against n8n 2.46 source and live (2026-11-09):
    - status and push use the same tag scope as diff (`resolveTagScope`).
    - push must refuse, or ask for explicit confirmation, when the workflows being pushed have broken-reference warnings.
 4. Polish: GitHub Action posting diffs as PR comments, hard-coded-secret scanner, README with `vhs` demo, npm publish
-   - Order: Markdown renderer + Action logic (done) → README + docs/ (done; `docs/demo.gif` from `vhs docs/demo.tape`, built on `scripts/demo-repo.mjs`) → npm release (changesets, trusted publishing; ask first) → composite `action.yml` pinned to an exact npm version, with `actions/setup-node` pinning Node → demo repo `akojif/flowdiff-demo` (ask first). README example workflow uses minimal permissions and a `concurrency` group.
+   - Order: Markdown renderer + Action logic (done) → README + docs/ (done; `docs/demo.gif` from `vhs docs/demo.tape`, built on `scripts/demo-repo.mjs`) → npm release 0.1.0 (prepared; see Releasing) → composite `action.yml` pinned to an exact npm version, with `actions/setup-node` pinning Node → demo repo `akojif/flowdiff-demo` (ask first). README example workflow uses minimal permissions and a `concurrency` group.
    - `--exit-code [changes|behavior]` is done (`shouldFail`): behavior = behavior changes, broken references, or added/removed workflows.
    - The GitHub Action must redact values the secret scanner flags before posting diffs as PR comments. It must NEVER allow `--show-secrets` (no input, no passthrough).
+
+## Releasing
+
+- Versions are managed with changesets: each behaviour change adds one (`npx changeset`). To release: `npx changeset version`, commit, `git tag -a vX.Y.Z`, push the commit and the tag.
+- `.github/workflows/release.yml` publishes on `v*` tags via npm trusted publishing (OIDC, no token; provenance is automatic). It runs in the `npm` GitHub environment (required reviewer, `v*` tags only), checks the tag matches `package.json`, skips versions already on npm, and `prepublishOnly` runs lint, typecheck, tests and build.
+- The npm trusted publisher must name owner `akojif`, repository `flowdiff`, workflow `release.yml`, environment `npm`; `repository.url` in package.json must match the repo exactly. A new trusted publisher configuration expires if it isn't used for a successful publish within 2 days. Trusted publishing needs npm >= 11.5.1 in CI (the workflow installs npm@11).
+- The package ships only `dist/cli.js`, README, LICENSE and (later) `action.yml`; no source map. Check with `npm pack --dry-run`.
+- The author does the publishing; never push release tags or publish without being asked.
 
 ## Backlog
 

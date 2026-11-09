@@ -1,0 +1,63 @@
+# Publishes to npm when a version tag (v1.2.3) is pushed, using npm trusted
+# publishing (OIDC): no npm token is stored anywhere. Provenance attestations are
+# generated automatically. The `npm` environment requires approval before the
+# job runs, and only accepts v* tags.
+#
+# This file name (release.yml) and the environment name (npm) must match the
+# trusted publisher configured on npmjs.com.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write # lets npm verify this workflow instead of a token
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs npm 11.5.1 or later.
+      - run: npm install --global npm@11
+
+      - name: Check the tag matches package.json
+        run: |
+          version="v$(node -p "require('./package.json').version")"
+          if [ "$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+
+      - name: Skip if this version is already on npm
+        id: published
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if npm view "flowdiff@$version" version >/dev/null 2>&1; then
+            echo "::notice::flowdiff@$version is already published; nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - run: npm ci
+        if: steps.published.outputs.skip != 'true'
+
+      # prepublishOnly runs lint, typecheck, tests and the build first.
+      - run: npm publish
+        if: steps.published.outputs.skip != 'true'

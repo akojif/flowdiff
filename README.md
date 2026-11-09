@@ -63,9 +63,6 @@ Requires Node.js 22 or later.
 npm install -g flowdiff
 ```
 
-> **Not published to npm yet.** Until the first release, install from source:
-> `git clone https://github.com/akojif/flowdiff && cd flowdiff && npm ci && npm run build && npm link`
-
 ```sh
 mkdir n8n-workflows && cd n8n-workflows && git init
 flowdiff init                       # instance URL, folder, optional tag
@@ -122,7 +119,7 @@ Why each of these exists, and the n8n API behaviour behind them: [docs/how-it-wo
 
 ## GitHub Action
 
-> **Coming with the first release.**
+> **Coming in a later release.** The Action isn't part of 0.1.0 yet.
 
 Comment on pull requests with a readable diff of the workflow files they change, and optionally fail the check on behavior changes. It works from git alone: no n8n instance or API key.
 
