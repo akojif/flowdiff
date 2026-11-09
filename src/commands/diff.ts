@@ -7,12 +7,12 @@ import { loadDotEnv, readEnv } from '../config/env.js';
 import { resolveTagScope } from '../config/tag-scope.js';
 import { compareWorkflowSets, hasDifferences, labelInstanceStatuses } from '../diff/index.js';
 import { FlowdiffError } from '../errors.js';
-import { normalizeWorkflow, type NormalizedWorkflow } from '../normalize/normalize.js';
+import type { NormalizedWorkflow } from '../normalize/normalize.js';
 import { renderJson, renderText } from '../render/index.js';
+import { loadInstanceScope } from './instance-scope.js';
 import { parseRange, readWorkflowsAtRef, refExists } from '../workspace/git.js';
-import { readLocalWorkflows, type WorkflowFile } from '../workspace/local-files.js';
+import type { WorkflowFile } from '../workspace/local-files.js';
 import { slugify } from '../workspace/paths.js';
-import { readState } from '../workspace/state.js';
 
 export interface DiffFlags {
   /** `--tag <name>` (string) or `--no-tag` (false). Ignored for git ranges. */
@@ -133,34 +133,21 @@ async function gitSides(cwd: string, config: Config, from: string, to: string): 
   };
 }
 
-/**
- * Instance side = workflows with the tag (if any) plus every workflow already
- * tracked locally, so removing the tag on the instance shows up as a tag change
- * instead of the local file looking like a new workflow.
- */
 async function instanceSides(
   cwd: string,
   config: Config,
   client: N8nClient,
   tag: string | undefined,
 ): Promise<Sides> {
-  const local = await readLocalWorkflows(cwd, config.workflowsDir);
-  const state = await readState(cwd);
-  const remote = (await client.listWorkflows())
-    .filter((workflow) => workflow.isArchived !== true)
-    .filter(
-      (workflow) =>
-        tag === undefined || local.has(workflow.id) || workflow.tags?.some((t) => t.name === tag),
-    )
-    .map(normalizeWorkflow);
+  const scope = await loadInstanceScope(cwd, config, client, tag);
   return {
     mode: 'instance',
-    before: new Map(remote.map((workflow) => [workflow.id, workflow])),
-    after: workflowsOf(local),
+    before: scope.instance,
+    after: workflowsOf(scope.local),
     beforeLabel: 'instance',
     afterLabel: 'local',
-    files: filesOf(local),
-    pulledIds: new Set(Object.keys(state.workflows)),
+    files: filesOf(scope.local),
+    pulledIds: new Set(Object.keys(scope.state.workflows)),
   };
 }
 

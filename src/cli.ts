@@ -4,6 +4,7 @@ import packageJson from '../package.json' with { type: 'json' };
 import { runDiff, type DiffFlags } from './commands/diff.js';
 import { runInit } from './commands/init.js';
 import { runPull } from './commands/pull.js';
+import { runStatus, type StatusFlags } from './commands/status.js';
 import { FlowdiffError } from './errors.js';
 
 const program = new Command()
@@ -28,6 +29,17 @@ program
   .option('--force', 'overwrite local edits even if the workflow changed on the instance')
   .action(async (flags: { tag?: string | false; force?: boolean }) => {
     await runPull(process.cwd(), flags);
+  });
+
+program
+  .command('status')
+  .description('show which workflows changed locally, on the instance, or both')
+  .option('--tag <name>', 'only consider workflows with this tag (overrides the saved tag)')
+  .option('--no-tag', 'ignore the tag saved in flowdiff.config.json for this run')
+  .option('--all', 'list untracked instance workflows individually')
+  .option('--json', 'machine-readable output')
+  .action(async (flags: StatusFlags) => {
+    await runStatus(process.cwd(), flags);
   });
 
 program

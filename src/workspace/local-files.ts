@@ -20,6 +20,8 @@ const workflowFileSchema = z.looseObject({
 export interface WorkflowFile {
   /** Path relative to the project, for messages. */
   file: string;
+  /** Raw file content, for comparing with the hash recorded at the last pull. */
+  content: string;
   workflow: NormalizedWorkflow;
 }
 
@@ -51,13 +53,14 @@ export async function readLocalWorkflows(
   for (const [id, [fileName]] of index) {
     if (fileName === undefined) continue;
     const file = join(workflowsDir, fileName);
-    const workflow = parseWorkflowFile(await readFile(join(cwd, file), 'utf8'), file);
+    const content = await readFile(join(cwd, file), 'utf8');
+    const workflow = parseWorkflowFile(content, file);
     if (workflow.id !== id) {
       throw new FlowdiffError(
         `${file} contains workflow id "${workflow.id}", but its file name says "${id}".`,
       );
     }
-    result.set(id, { file, workflow });
+    result.set(id, { file, content, workflow });
   }
   return result;
 }

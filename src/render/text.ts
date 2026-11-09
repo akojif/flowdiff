@@ -14,6 +14,7 @@ import {
   hasDifferences,
   isPossibleDefaultChange,
 } from '../diff/index.js';
+import { untrackedLines } from './untracked.js';
 
 export const DEFAULT_MAX_VALUE_LENGTH = 80;
 const DEFAULT_WIDTH = 80;
@@ -58,7 +59,13 @@ export function renderText(comparisons: WorkflowComparison[], options: TextRende
   }
 
   lines.push(summaryLine(comparisons, options), ...hints(comparisons, c));
-  lines.push(...untrackedLines(comparisons, c, options));
+  lines.push(
+    ...untrackedLines(
+      comparisons.filter((comparison) => comparison.status === 'untracked'),
+      c,
+      options.showAll === true,
+    ),
+  );
   return lines.join('\n');
 }
 
@@ -296,30 +303,6 @@ export function breakdown(changes: Change[]): string {
   return parts.length > MAX_BREAKDOWN_ITEMS
     ? `${parts.slice(0, MAX_BREAKDOWN_ITEMS).join(' · ')} · …`
     : parts.join(' · ');
-}
-
-/**
- * Workflows on the instance that are not tracked locally: one dim line by
- * default, listed individually with `showAll`. They are never shown as removals,
- * because push never deletes.
- */
-function untrackedLines(
-  comparisons: WorkflowComparison[],
-  c: Colors,
-  options: TextRenderOptions,
-): string[] {
-  const untracked = comparisons.filter((comparison) => comparison.status === 'untracked');
-  if (untracked.length === 0) return [];
-
-  const count = untracked.length;
-  const noun = count === 1 ? 'workflow' : 'workflows';
-  const verb = count === 1 ? "isn't" : "aren't";
-  const headline = `${String(count)} ${noun} on the instance ${verb} tracked locally (run flowdiff pull to add them)`;
-  if (options.showAll !== true) return [c.dim(headline)];
-  return [
-    c.dim(`${headline}:`),
-    ...untracked.map((comparison) => c.dim(`  ? ${comparison.name} (${comparison.id})`)),
-  ];
 }
 
 function summaryLine(comparisons: WorkflowComparison[], options: TextRenderOptions): string {

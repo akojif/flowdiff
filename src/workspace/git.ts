@@ -68,7 +68,7 @@ export async function readWorkflowsAtRef(
     if (workflowIdFromFileName(basename(file)) === undefined) continue;
     const content = await git(cwd, ['show', `${ref}:./${file}`]);
     const workflow = parseWorkflowFile(content, `${file} at ${ref}`);
-    result.set(workflow.id, { file, workflow });
+    result.set(workflow.id, { file, content, workflow });
   }
   return result;
 }
