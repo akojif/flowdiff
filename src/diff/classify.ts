@@ -76,3 +76,31 @@ export function countChanges(changes: Change[]): ChangeCounts {
 export function hasBehaviorImpact(comparison: { changes: Change[]; warnings: unknown[] }): boolean {
   return comparison.warnings.length > 0 || countChanges(comparison.changes).behavior > 0;
 }
+
+export type FailOn = 'none' | 'changes' | 'behavior';
+
+/**
+ * Whether a set of comparisons should fail a check (CLI --exit-code, Action fail-on).
+ * - changes: any difference (untracked instance workflows don't count)
+ * - behavior: behavior changes or broken references (hasBehaviorImpact), or a
+ *   workflow added, removed or deleted; cosmetic-only differences pass
+ */
+export function shouldFail(
+  comparisons: { status: string; changes: Change[]; warnings: unknown[] }[],
+  mode: FailOn,
+): boolean {
+  switch (mode) {
+    case 'none':
+      return false;
+    case 'changes':
+      return comparisons.some((c) => c.status !== 'unchanged' && c.status !== 'untracked');
+    case 'behavior':
+      return comparisons.some(
+        (c) =>
+          c.status === 'only-after' ||
+          c.status === 'only-before' ||
+          c.status === 'deleted-on-instance' ||
+          (c.status === 'changed' && hasBehaviorImpact(c)),
+      );
+  }
+}

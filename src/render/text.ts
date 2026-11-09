@@ -36,6 +36,8 @@ export interface TextRenderOptions {
   width?: number;
   /** Heading, e.g. "Changes push would make to the instance". Default: "before → after". */
   title?: string;
+  /** Indent for lines of a line-level text diff. Default: aligned under the change. */
+  hunkIndent?: string;
 }
 
 type Colors = ReturnType<typeof createColors>;
@@ -74,7 +76,7 @@ export function renderText(comparisons: WorkflowComparison[], options: TextRende
 }
 
 /** Workflows that get their own entry (unchanged and untracked ones only appear in totals). */
-function isListed(comparison: WorkflowComparison): boolean {
+export function isListed(comparison: WorkflowComparison): boolean {
   return comparison.status !== 'unchanged' && comparison.status !== 'untracked';
 }
 
@@ -263,7 +265,7 @@ function fit(text: string, width: number): string {
   return text.length <= width ? text.padEnd(width) : `${text.slice(0, width - 1)}…`;
 }
 
-function plural(count: number, noun: string): string {
+export function plural(count: number, noun: string): string {
   return `${String(count)} ${noun}${count === 1 ? '' : 's'}`;
 }
 
@@ -320,7 +322,10 @@ export function breakdown(changes: Change[]): string {
     : parts.join(' · ');
 }
 
-function summaryLine(comparisons: WorkflowComparison[], options: TextRenderOptions): string {
+export function summaryLine(
+  comparisons: WorkflowComparison[],
+  options: Pick<TextRenderOptions, 'beforeLabel' | 'afterLabel'>,
+): string {
   const count = (status: WorkflowComparison['status']) =>
     comparisons.filter((comparison) => comparison.status === status).length;
   const optional = (n: number, label: string) => (n > 0 ? `${String(n)} ${label}` : '');
@@ -354,33 +359,56 @@ function summaryLine(comparisons: WorkflowComparison[], options: TextRenderOptio
   return hasDifferences(comparisons) ? `${parts.join(', ')}.` : `No changes (${parts[1] ?? ''}).`;
 }
 
-function hints(comparisons: WorkflowComparison[], c: Colors): string[] {
-  const lines: string[] = [];
+export interface Hint {
+  tone: 'info' | 'warning';
+  text: string;
+}
+
+/**
+ * Explanations printed under the summary, shared by the text and Markdown
+ * renderers. `canShowSecrets` is false where --show-secrets doesn't exist
+ * (the GitHub Action), so the hint never suggests it there.
+ */
+export function hintsFor(comparisons: WorkflowComparison[], canShowSecrets: boolean): Hint[] {
+  const hints: Hint[] = [];
   if (comparisons.some((comparison) => comparison.changes.some(isPossibleDefaultChange))) {
-    lines.push(
-      c.dim(
+    hints.push({
+      tone: 'info',
+      text:
         'Possible defaults: parameters set on one side only. The n8n editor removes parameters equal to ' +
-          'their defaults when saving; run flowdiff pull to refresh your baseline.',
-      ),
-    );
+        'their defaults when saving; run flowdiff pull to refresh your baseline.',
+    });
   }
   if (comparisons.some((comparison) => comparison.warnings.length > 0)) {
-    lines.push(
-      c.yellow(
+    hints.push({
+      tone: 'warning',
+      text:
         'Broken references: expressions or Code nodes refer to node names that do not exist, often after a ' +
-          'rename. These nodes will fail when they run.',
-      ),
-    );
+        'rename. These nodes will fail when they run.',
+    });
   }
   if (comparisons.some((comparison) => comparison.secrets.length > 0)) {
-    lines.push(
-      c.yellow(
+    hints.push({
+      tone: 'warning',
+      text:
         'Possible secrets: values that look like hard-coded credentials; use n8n credentials instead. ' +
-          'Values are redacted in this output (--show-secrets shows them). The check is heuristic and can miss secrets.',
-      ),
-    );
+        'If a real secret was committed, rotate it: redacting the output does not remove it from git history. ' +
+        `Values are redacted here${canShowSecrets ? ' (--show-secrets shows them)' : ''}. ` +
+        'The check is heuristic and can miss secrets.',
+    });
   }
-  return lines;
+  return hints;
+}
+
+function hints(comparisons: WorkflowComparison[], c: Colors): string[] {
+  return hintsFor(comparisons, true).map((hint) =>
+    hint.tone === 'warning' ? c.yellow(hint.text) : c.dim(hint.text),
+  );
+}
+
+/** Plain (uncoloured) lines for one change. */
+export function changeLines(change: Change, options: TextRenderOptions): string[] {
+  return renderChange(change, createColors(false), options);
 }
 
 const LABEL_WIDTH = 8;
@@ -492,7 +520,7 @@ function renderChange(change: Change, c: Colors, options: TextRenderOptions): st
           ),
         ];
       case 'text': {
-        const indent = ' '.repeat(LABEL_WIDTH + 2);
+        const indent = options.hunkIndent ?? ' '.repeat(LABEL_WIDTH + 2);
         const out = [line('~', label, subject)];
         if (valueChange.lineEndingsChanged) out.push(`${indent}${c.dim('(line endings changed)')}`);
         for (const hunk of valueChange.hunks) {

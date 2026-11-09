@@ -5,16 +5,27 @@ import { readConfig, type Config } from '../config/config-file.js';
 import { resolveConnection } from '../config/connection.js';
 import { loadDotEnv, readEnv } from '../config/env.js';
 import { resolveTagScope } from '../config/tag-scope.js';
-import { compareWorkflowSets, hasDifferences, labelInstanceStatuses } from '../diff/index.js';
+import {
+  compareWorkflowSets,
+  hasDifferences,
+  labelInstanceStatuses,
+  shouldFail,
+  type FailOn,
+  type WorkflowComparison,
+} from '../diff/index.js';
 import { FlowdiffError } from '../errors.js';
 import type { NormalizedWorkflow } from '../normalize/normalize.js';
-import { renderJson, renderText } from '../render/index.js';
+import { renderJson, renderMarkdown, renderText } from '../render/index.js';
 import { loadInstanceScope } from './instance-scope.js';
 import { parseRange, readWorkflowsAtRef, refExists } from '../workspace/git.js';
 import type { WorkflowFile } from '../workspace/local-files.js';
 import { slugify } from '../workspace/paths.js';
 
+export type DiffFormat = 'text' | 'json' | 'markdown';
+
 export interface DiffFlags {
+  /** Output format. `--json` is shorthand for `--format json`. */
+  format?: DiffFormat;
   /** `--tag <name>` (string) or `--no-tag` (false). Ignored for git ranges. */
   tag?: string | false;
   /** List untracked instance workflows individually. */
@@ -26,7 +37,8 @@ export interface DiffFlags {
   json?: boolean;
   includeLayout?: boolean;
   full?: boolean;
-  exitCode?: boolean;
+  /** `--exit-code` (true = changes) or `--exit-code behavior`. */
+  exitCode?: boolean | string;
 }
 
 export interface DiffCommandOptions {
@@ -53,6 +65,7 @@ export const SUMMARY_THRESHOLD = 5;
 export interface DiffCommandResult {
   output: string;
   differs: boolean;
+  comparisons: WorkflowComparison[];
 }
 
 interface Sides {
@@ -115,19 +128,35 @@ export async function diffCommand(options: DiffCommandOptions): Promise<DiffComm
     sides.mode === 'instance'
       ? PUSH_TITLE
       : `Changes from ${sides.beforeLabel} to ${sides.afterLabel}`;
-  const output =
-    flags.json === true
-      ? renderJson(comparisons, labels)
-      : renderText(comparisons, {
-          ...labels,
-          color: options.color,
-          full: flags.full === true,
-          showAll: flags.all === true,
-          view,
-          title,
-          ...(options.width === undefined ? {} : { width: options.width }),
-        });
-  return { output, differs: hasDifferences(comparisons) };
+  const format = flags.json === true ? 'json' : (flags.format ?? 'text');
+  let output: string;
+  switch (format) {
+    case 'json':
+      output = renderJson(comparisons, labels);
+      break;
+    case 'markdown':
+      output = renderMarkdown(comparisons, {
+        ...labels,
+        title,
+        full: flags.full === true,
+        canShowSecrets: true,
+      }).markdown;
+      break;
+    case 'text':
+      output = renderText(comparisons, {
+        ...labels,
+        color: options.color,
+        full: flags.full === true,
+        showAll: flags.all === true,
+        view,
+        title,
+        ...(options.width === undefined ? {} : { width: options.width }),
+      });
+      break;
+    default:
+      throw new FlowdiffError(`Unknown format "${String(format)}". Use text, json or markdown.`);
+  }
+  return { output, differs: hasDifferences(comparisons), comparisons };
 }
 
 async function gitSides(cwd: string, config: Config, from: string, to: string): Promise<Sides> {
@@ -214,6 +243,14 @@ export function selectWorkflows(
   return matches;
 }
 
+/** `--exit-code` alone means "changes"; `--exit-code behavior` only fails on behavior. */
+export function exitCodeMode(flag: boolean | string | undefined): FailOn {
+  if (flag === undefined || flag === false) return 'none';
+  if (flag === true || flag === 'changes') return 'changes';
+  if (flag === 'behavior') return 'behavior';
+  throw new FlowdiffError(`Unknown --exit-code mode "${flag}". Use "changes" or "behavior".`);
+}
+
 /** CLI entry point for `flowdiff diff`. */
 export async function runDiff(
   cwd: string,
@@ -237,5 +274,6 @@ export async function runDiff(
     },
   });
   console.log(result.output);
-  if (flags.exitCode === true && result.differs) process.exitCode = 1;
+  const mode = exitCodeMode(flags.exitCode);
+  if (shouldFail(result.comparisons, mode)) process.exitCode = 1;
 }

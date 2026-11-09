@@ -53,11 +53,15 @@ program
   .option('--all', 'list untracked instance workflows individually')
   .option('--stat', 'one summary line per workflow (default when more than 5 changed)')
   .option('--no-stat', 'always show every change')
-  .option('--json', 'machine-readable output (never truncated)')
+  .option('--format <format>', 'output format: text, json or markdown', 'text')
+  .option('--json', 'shorthand for --format json (never truncated)')
   .option('--show-secrets', 'show values that look like secrets instead of redacting them')
   .option('--include-layout', 'also show node position changes')
   .option('--full', 'show long values in full instead of truncating them')
-  .option('--exit-code', 'exit with 1 if there are changes (for CI)')
+  .option(
+    '--exit-code [mode]',
+    'exit with 1 on changes (default) or only on behavior changes ("behavior"), for CI',
+  )
   .addHelpText(
     'after',
     `
@@ -65,7 +69,8 @@ Examples:
   flowdiff diff                       all workflows, instance → local
   flowdiff diff "Order Sync"          one workflow, by name, id or file name
   flowdiff diff main..feature         workflow files between two git refs
-  flowdiff diff main..feature --json --exit-code`,
+  flowdiff diff main..feature --json --exit-code
+  flowdiff diff main..feature --format markdown --exit-code behavior`,
   )
   .action(async (target: string | undefined, workflow: string | undefined, flags: DiffFlags) => {
     await runDiff(process.cwd(), target, workflow, flags);
