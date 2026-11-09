@@ -4,6 +4,7 @@ import packageJson from '../package.json' with { type: 'json' };
 import { runDiff, type DiffFlags } from './commands/diff.js';
 import { runInit } from './commands/init.js';
 import { runPull } from './commands/pull.js';
+import { runPush, type PushFlags } from './commands/push.js';
 import { runStatus, type StatusFlags } from './commands/status.js';
 import { FlowdiffError } from './errors.js';
 
@@ -67,6 +68,18 @@ Examples:
   )
   .action(async (target: string | undefined, workflow: string | undefined, flags: DiffFlags) => {
     await runDiff(process.cwd(), target, workflow, flags);
+  });
+
+program
+  .command('push [workflow]')
+  .description('upload local changes to the instance (shows the diff and asks first)')
+  .option('--dry-run', 'show what would be pushed and change nothing')
+  .option('--force', 'overwrite even if the workflow changed on the instance since the last pull')
+  .option('--apply-active', 'also switch workflows on/off to match the local files')
+  .option('--tag <name>', 'only consider workflows with this tag (overrides the saved tag)')
+  .option('--no-tag', 'ignore the tag saved in flowdiff.config.json for this run')
+  .action(async (workflow: string | undefined, flags: PushFlags) => {
+    await runPush(process.cwd(), workflow, flags);
   });
 
 // Exit codes: 0 = success / no changes, 1 = changes or conflicts found, 2 = error.
