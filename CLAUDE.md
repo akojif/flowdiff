@@ -97,13 +97,12 @@ Verified against n8n 2.46 source and live (2026-11-09):
    - status and push use the same tag scope as diff (`resolveTagScope`).
    - push must refuse, or ask for explicit confirmation, when the workflows being pushed have broken-reference warnings.
 4. Polish: GitHub Action posting diffs as PR comments, hard-coded-secret scanner, README with `vhs` demo, npm publish
-   - Order: Markdown renderer + Action logic (done) → README → npm release (changesets, trusted publishing; ask first) → composite `action.yml` pinned to an exact npm version, with `actions/setup-node` pinning Node → demo repo `akojif/flowdiff-demo` (ask first). README example workflow uses minimal permissions and a `concurrency` group.
+   - Order: Markdown renderer + Action logic (done) → README + docs/ (done; `docs/demo.gif` from `vhs docs/demo.tape`, built on `scripts/demo-repo.mjs`) → npm release (changesets, trusted publishing; ask first) → composite `action.yml` pinned to an exact npm version, with `actions/setup-node` pinning Node → demo repo `akojif/flowdiff-demo` (ask first). README example workflow uses minimal permissions and a `concurrency` group.
    - `--exit-code [changes|behavior]` is done (`shouldFail`): behavior = behavior changes, broken references, or added/removed workflows.
    - The GitHub Action must redact values the secret scanner flags before posting diffs as PR comments. It must NEVER allow `--show-secrets` (no input, no passthrough).
 
 ## Backlog
 
-- README: state that the secret scanner is heuristic and doesn't catch every secret (a clean result means "no known pattern found").
 - Description syncing: the list endpoint doesn't return `description`, so it is never pulled or pushed (n8n keeps it untouched). Syncing it would mean fetching each workflow with the single GET (one request per workflow) and hashing that shape everywhere.
 - Future CI push mode: needs a non-interactive path (no `--yes` today) with extra safeguards, e.g. an explicit allow-list of workflow ids, `--exit-code` on refusals, and a separate write key.
 - Action `fail-on: secrets` (secrets currently only warn and suggest key rotation).
