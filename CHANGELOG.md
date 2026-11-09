@@ -1,5 +1,11 @@
 # @akojif/flowdiff
 
+## 0.1.1
+
+### Patch Changes
+
+- 38daf56: `diff --stat` no longer shortens workflow names when output is piped to a file or another program; names are only fitted to the width in an interactive terminal.
+
 ## 0.1.0
 
 ### Minor Changes
